@@ -81,6 +81,7 @@
     <li><a href="#ops">동형연산 종류와 곱셈 깊이</a></li>
     <li><a href="#noise">노이즈 예산 (Noise Budget)</a></li>
     <li><a href="#pattern">패턴 매칭 트릭 — 다항식 zero-test</a></li>
+    <li><a href="#keyword">키워드/와일드카드 검색 — 토큰 단위 HE 매칭</a></li>
     <li><a href="#privacy">본 데모의 프라이버시 모델</a></li>
     <li><a href="#caveats">실제 운영 시 고려사항</a></li>
     <li><a href="#refs">참고 자료</a></li>
@@ -267,7 +268,54 @@ sq   = diff × diff   // 0 만 0, 다른 값은 양수
 // → 모든 슬롯이 0 ⇔ 완전 일치
 </pre>
 
-<h2 id="privacy">8. 본 데모의 프라이버시 모델</h2>
+<h2 id="keyword">8. 키워드/와일드카드 검색 — 토큰 단위 HE 매칭</h2>
+<p>
+  탭 4 의 "Keyword Search (HE)" 는 임의의 키워드를 동형암호 위에서 검색합니다.
+  핵심 아이디어는 <b>문자 단위 비교를 SIMD 슬롯에 펼친 후 마스크를 곱해 와일드카드를 처리</b> 하는 것:
+</p>
+
+<pre>
+패턴 P  = "p?ssword"  (? = '*'  와일드카드)
+target = ['p', 0, 's', 's', 'w', 'o', 'r', 'd']
+mask   = [ 1, 0,  1,   1,   1,   1,   1,   1 ]   (와일드카드 자리만 0)
+
+token  = "password" (codepoint vector)
+ct     = Enc(token)
+
+서버:
+  diff = ct − Plain(target)            // 슬롯별 차이
+  sq   = diff × diff                   // 음수 영향 제거 (depth 1)
+  out  = sq × Plain(mask)              // 와일드카드 자리는 0 유지 (depth 2)
+
+클라이언트:
+  out 복호화 → 슬롯 0..L-1 합 = 0  ⇒  MATCH
+</pre>
+
+<h3>왜 길이가 같은 토큰만 후보가 되는가</h3>
+<p>
+  슬롯 단위 SIMD 비교는 같은 길이의 벡터끼리만 의미가 있습니다.
+  그래서 클라이언트에서 공백 단위로 토큰화한 뒤 <b>패턴 길이와 정확히 일치하는 토큰만</b> 골라 암호화합니다.
+  '*' 는 한 글자 와일드카드라는 점에 주의 — <code>pa*sword</code> 는 8자 토큰만, <code>pa**word</code> 는 8자 토큰 중 자리 2,3 이 임의인 것만.
+</p>
+
+<h3>일반 정규식이 HE 위에서 곤란한 이유</h3>
+<p>
+  자릿수별 char class (예: <code>\d</code> = <code>[0-9]</code>) 는 그 자리의 코드포인트 c 가 집합 안에 있는지를
+  <b>다항식 zero-test</b>로 풀어야 합니다. 즉 자리마다
+  <code>(c − v₁)(c − v₂)…(c − vₙ)</code> 곱셈 트리를 평가해야 하고, 자리마다 다항식 차수가 달라
+  SIMD 한 번에 처리하기 어렵습니다. 결과적으로
+</p>
+<ul>
+  <li>자리마다 별도 동형 곱셈 → 곱셈 깊이가 폭증 (예: <code>[0-9]</code> 만으로 깊이 ≈ log₂10 ≈ 4)</li>
+  <li>각 자리 결과를 슬롯 합으로 모으려면 Galois rotations(회전 키) 가 추가 필요</li>
+  <li>큰 poly_modulus_degree (16384+) 와 그에 따른 키·암호문 크기 증가</li>
+</ul>
+<p>
+  본 데모는 와일드카드(<code>*</code>) 만 지원해 깊이 2 회로(8192) 에서 빠르게 동작하도록 했습니다.
+  필요하면 같은 패턴 매칭 트릭을 여러 자리에 일반화해 char class 까지 확장 가능 (위 한계를 감수하면).
+</p>
+
+<h2 id="privacy">9. 본 데모의 프라이버시 모델</h2>
 <pre>
 ┌─────────── CLIENT (data owner) ───────────┐
 │ 보유: EncParms, publicKey, secretKey,       │
@@ -293,7 +341,7 @@ sq   = diff × diff   // 0 만 0, 다른 값은 양수
   <li>탭 2(SEAL)·탭 3(RRN Search) 모두 같은 모델 — 다만 본 브라우저 데모에서는 클라이언트와 서버 역할이 같은 페이지에서 시뮬레이션되어 있을 뿐</li>
 </ul>
 
-<h2 id="caveats">9. 실제 운영 시 고려사항</h2>
+<h2 id="caveats">10. 실제 운영 시 고려사항</h2>
 <ul>
   <li><b>비밀키 분리</b> — 데모는 편의상 brower 메모리에 두고 화면에도 보여주지만, 실제 시스템은 KMS/HSM/TPM 또는 보안 엔클레이브에서만 사용해야 함</li>
   <li><b>매개변수 선택</b> — security level (HE Standard 권장 128bit), poly_modulus_degree, plain_modulus 는 위협 모델·연산 깊이·성능 요구 균형으로 결정</li>
@@ -303,7 +351,7 @@ sq   = diff × diff   // 0 만 0, 다른 값은 양수
   <li><b>RRN 검색의 부정확성</b> — 정규식 추출에 의존하므로 띄어쓰기·특수문자가 끼어든 변형은 보강 필요. 진짜 양방향 PSI 가 필요하면 OPRF + HE 조합 또는 PIR 사용</li>
 </ul>
 
-<h2 id="refs">10. 참고 자료</h2>
+<h2 id="refs">11. 참고 자료</h2>
 <ul>
   <li><a href="https://github.com/microsoft/SEAL" target="_blank">Microsoft SEAL</a> — C++ 본체 라이브러리</li>
   <li><a href="https://github.com/morfix-io/node-seal" target="_blank">node-seal</a> — JS/WASM 래퍼 (본 데모가 사용)</li>

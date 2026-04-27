@@ -123,6 +123,7 @@
   <button class="tab-btn active" data-tab="scanner">PII Scanner</button>
   <button class="tab-btn" data-tab="seal">SEAL (Homomorphic Encryption)</button>
   <button class="tab-btn" data-tab="rrn">RRN Search (HE)</button>
+  <button class="tab-btn" data-tab="kw">Keyword Search (HE)</button>
 </div>
 
 <!-- ========================= TAB 1 : PII SCANNER ========================= -->
@@ -425,6 +426,116 @@
 </div>
 </div>
 
+<!-- ========================= TAB 4 : KEYWORD SEARCH (HE) ========================= -->
+<div id="tab-kw" class="tab-panel">
+<div class="row">
+
+  <div class="col">
+    <div class="card">
+      <h2>이 데모가 보여주는 것</h2>
+      <p style="color:var(--muted); font-size:13px; margin:4px 0 0;">
+        문서 안에 임의의 <b>키워드 또는 와일드카드 패턴</b> 이 들어있는지를, 토큰을 BFV 암호화한 채로 검사합니다.
+        길이가 같은 토큰들이 후보가 되며 서버는 <code class="mono">(ct − target)² × mask</code> 만 동형연산해 결과 ct 를 돌려줍니다.
+        클라이언트만이 복호화로 매치 여부를 확인합니다.
+      </p>
+      <p style="color:var(--muted); font-size:12px; margin-top:8px;">
+        ※ 본 데모는 <b>ASCII 문자 (코드포인트 ≤ 127) 에 한해</b> 동작합니다 — plain modulus 가 20bit 라 비ASCII 코드는 제곱 시 오버플로 가능. 한국어 패턴 검색은 PII Scanner 탭의 사용자 정의 룰을 사용하세요.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>1. 입력</h2>
+      <label>Document</label>
+      <textarea id="kw-doc" rows="8">This is a confidential note.
+Email: john.doe@acme.com
+Password: P@ssw0rd123
+Backup login: hunter2_okay
+Token: tk_abcdef_42
+Server: srv-01.internal
+</textarea>
+
+      <label style="margin-top:10px; display:block;">Keyword patterns <span style="color:var(--muted);">(한 줄에 하나, <code>*</code> = 임의의 한 글자)</span></label>
+      <textarea id="kw-pattern" rows="4">P@ssw*rd123
+hunter2_*kay
+tk_******_42
+</textarea>
+
+      <div class="row-line">
+        <button id="kw-run">Run Encrypted Search</button>
+        <span id="kw-status" class="empty">대기 중</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2. 결과</h2>
+      <table id="kw-table">
+        <thead><tr>
+          <th>#</th><th>Pattern</th><th>Token</th><th class="num">위치</th><th class="num">슬롯합</th><th>Match</th>
+        </tr></thead>
+        <tbody><tr><td colspan="6" class="empty">실행 후 표시됩니다.</td></tr></tbody>
+      </table>
+      <p style="color:var(--muted); font-size:12px; margin-top:8px;">
+        패턴과 같은 길이의 토큰들이 후보. 슬롯합 = 마스킹된 squared diff 의 합 (0 → MATCH).
+      </p>
+      <div class="row-line">
+        <button class="secondary" id="kw-bundle-dl" disabled>Download bundle (JSON, 모든 ct)</button>
+        <span id="kw-bundle-info" class="empty">실행 후 활성화</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h2>프라이버시 경계</h2>
+<pre style="background:#0b0d12; border:1px solid var(--line); border-radius:8px; padding:12px; font-size:12px; line-height:1.6; color:var(--muted); overflow-x:auto;">
+┌─────────── CLIENT ───────────┐
+│ 공백 단위 토큰화                 │
+│ 패턴 P (길이 L) 와 같은 길이만 추림 │
+│ 각 토큰 → 코드포인트 벡터 → BFV   │
+│   [c0, c1, ..., cL-1, 0, 0, ...] │
+└──────────────↓────────────────┘
+┌─────────── SERVER (no sk) ────┐
+│ target = Plain([P0..PL-1])    │
+│   (와일드카드 자리는 0)         │
+│ mask   = Plain([m0..mL-1])    │
+│   (mi=1 if Pi 리터럴, 0 if *)  │
+│ diff  = ct − target          │
+│ sq    = diff × diff (depth 1) │
+│ relinearize                   │
+│ out   = sq × mask  (depth 2)  │
+│   → 와일드카드 자리는 0 유지     │
+└──────────────↓────────────────┘
+┌─────────── CLIENT ───────────┐
+│ 슬롯 0..L-1 합 = 0  ⇒  MATCH   │
+└──────────────────────────────┘
+</pre>
+    </div>
+
+    <div class="card">
+      <h2>키 (Keys)</h2>
+      <p style="color:var(--muted); font-size:12px; margin:4px 0 8px;">
+        SEAL/RRN 탭과 동일한 컨텍스트의 키.
+      </p>
+      <div id="kw-keys"><span class="empty">초기화 후 표시됩니다.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>암호문 (Ciphertexts)</h2>
+      <p style="color:var(--muted); font-size:12px; margin:4px 0 8px;">
+        패턴별로 후보 토큰의 입력 ct 와 서버 결과 ct 가 나열됩니다.
+      </p>
+      <div id="kw-ciphers"><span class="empty">실행 후 표시됩니다.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>실행 로그</h2>
+      <pre class="log" id="kw-log"></pre>
+    </div>
+  </div>
+
+</div>
+</div>
+
 <!-- node-seal (Microsoft SEAL WASM) -->
 <script src="https://unpkg.com/node-seal@5.1.5/throws_wasm_web_umd.js"></script>
 
@@ -436,7 +547,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-    if ((btn.dataset.tab === 'seal' || btn.dataset.tab === 'rrn') && !sealReady) initSeal();
+    if (['seal','rrn','kw'].includes(btn.dataset.tab) && !sealReady) initSeal();
   });
 });
 
@@ -811,7 +922,7 @@ const KEY_META = {
 };
 
 function refreshKeysPanel() {
-  ['seal-keys', 'rrn-keys'].forEach(id => {
+  ['seal-keys', 'rrn-keys', 'kw-keys'].forEach(id => {
     const target = document.getElementById(id);
     if (!target) return;
     if (!sealReady) {
@@ -871,7 +982,8 @@ function refreshCiphersPanel() {
 
 // 패널 컨테이너에 한 번만 클릭 위임 핸들러를 부착
 (function bindPanels() {
-  ['seal-keys', 'seal-ciphers', 'rrn-keys', 'rrn-ciphers'].forEach(id => {
+  ['seal-keys', 'seal-ciphers', 'rrn-keys', 'rrn-ciphers',
+   'kw-keys', 'kw-ciphers'].forEach(id => {
     const el = document.getElementById(id);
     if (el) attachSerHandlers(el);
   });
@@ -1244,6 +1356,247 @@ document.querySelectorAll('input[name="rrn-mode"]').forEach(r => {
     rrnUI.target.disabled = !exact;
     rrnUI.target.style.opacity = exact ? 1 : 0.4;
   });
+});
+
+/* ========================= TAB 4 : KEYWORD SEARCH (HE) ========================= */
+const kwUI = {
+  doc:        document.getElementById('kw-doc'),
+  pattern:    document.getElementById('kw-pattern'),
+  run:        document.getElementById('kw-run'),
+  status:     document.getElementById('kw-status'),
+  table:      document.querySelector('#kw-table tbody'),
+  log:        document.getElementById('kw-log'),
+  bundleDl:   document.getElementById('kw-bundle-dl'),
+  bundleInfo: document.getElementById('kw-bundle-info'),
+  ciphers:    document.getElementById('kw-ciphers'),
+};
+
+function kwLog(msg) {
+  const t = new Date().toTimeString().slice(0, 8);
+  kwUI.log.textContent += `[${t}] ${msg}\n`;
+  kwUI.log.scrollTop = kwUI.log.scrollHeight;
+}
+
+let _kwBundle = null;
+kwUI.bundleDl.addEventListener('click', () => {
+  if (!_kwBundle) return;
+  downloadText('kw_search_bundle.json', JSON.stringify(_kwBundle, null, 2));
+});
+
+const KW_WILD = '*';
+
+/* 패턴 → [{isWild, codepoint}] (문자열 길이 = 매치 길이) */
+function parseKwPattern(pat) {
+  const arr = Array.from(pat);
+  return arr.map(c => ({
+    isWild: c === KW_WILD,
+    codepoint: c === KW_WILD ? 0 : c.codePointAt(0),
+  }));
+}
+
+/* 공백 단위 토큰화 */
+function tokenizeText(text) {
+  const re = /\S+/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    out.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
+  }
+  return out;
+}
+
+function isAsciiOnly(s) {
+  return Array.from(s).every(c => c.codePointAt(0) <= 127);
+}
+
+function tokenCodepoints(text) {
+  return Array.from(text).map(c => c.codePointAt(0));
+}
+
+function buildKwTargetAndMask(parsed, slotCount) {
+  const target = new Int32Array(slotCount);
+  const mask   = new Int32Array(slotCount);
+  parsed.forEach((p, i) => {
+    target[i] = p.isWild ? 0 : p.codepoint;
+    mask[i]   = p.isWild ? 0 : 1;
+  });
+  return { target, mask };
+}
+
+function refreshKwCiphersPanel(groups) {
+  if (!groups || !groups.length) {
+    kwUI.ciphers.innerHTML = '<span class="empty">실행 후 표시됩니다.</span>';
+    return;
+  }
+  kwUI.ciphers.innerHTML = groups.map(g => `
+    <div style="margin-bottom:14px; padding-bottom:8px; border-bottom:1px dashed var(--line);">
+      <div style="font-size:12px; color:var(--muted); margin-bottom:6px;">
+        Pattern <code class="mono">${escapeHtml(g.pattern)}</code> · 후보 ${g.items.length}개
+      </div>
+      ${g.items.map((it, i) => `
+        <div style="font-size:11.5px; color:var(--muted); margin:6px 0 2px;">
+          Token "<code class="mono">${escapeHtml(it.token)}</code>" @${it.start}-${it.end}
+        </div>
+        ${renderSerRow(`Input ct (${g.pattern} #${i+1})`,    it.inputCt,  `kw_input_${slugify(g.pattern)}_${i+1}.b64.txt`,  { protection:'public', description: CT_DESC_INPUT })}
+        ${renderSerRow(`Server result (${g.pattern} #${i+1})`, it.resultCt, `kw_result_${slugify(g.pattern)}_${i+1}.b64.txt`, { protection:'public', description: CT_DESC_RESULT })}
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function slugify(s) {
+  return s.replace(/[^A-Za-z0-9._\-]/g, '_').slice(0, 40) || 'pattern';
+}
+
+kwUI.run.addEventListener('click', async () => {
+  kwUI.run.disabled = true;
+  kwUI.status.textContent = '진행 중...';
+  kwUI.log.textContent = '';
+  refreshKwCiphersPanel([]);
+
+  try {
+    const ok = await ensureSealForRRN();   // 동일 컨텍스트(BFV/8192) 재사용
+    if (!ok) { kwUI.status.textContent = 'SEAL 준비 실패'; return; }
+
+    const text = kwUI.doc.value;
+    const patterns = kwUI.pattern.value
+      .split(/\r?\n/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (!patterns.length) {
+      alert('Keyword pattern 을 한 줄 이상 입력하세요.');
+      return;
+    }
+
+    if (!isAsciiOnly(text) || patterns.some(p => !isAsciiOnly(p))) {
+      if (!confirm('비ASCII 문자가 포함되어 있습니다. plain modulus 한계로 결과가 부정확할 수 있습니다. 계속 진행할까요?')) return;
+    }
+
+    const tokens = tokenizeText(text);
+    kwLog(`===== CLIENT (has secret key) =====`);
+    kwLog(`문서 토큰화: ${tokens.length} 개`);
+
+    const allRows = [];
+    const allGroups = [];
+    const bundlePatterns = [];
+
+    for (let p = 0; p < patterns.length; p++) {
+      const pat = patterns[p];
+      const parsed = parseKwPattern(pat);
+      const L = parsed.length;
+      const cands = tokens.filter(t => Array.from(t.text).length === L);
+      kwLog(`  [pat ${p+1}] "${pat}" (length=${L}) → 후보 ${cands.length}개`);
+      if (cands.length === 0) continue;
+
+      // 후보 암호화
+      const t0 = performance.now();
+      const inputCts = cands.map(t => {
+        const codes = tokenCodepoints(t.text);
+        const arr = new Int32Array(S.slotCount);
+        codes.forEach((c, i) => arr[i] = c | 0);
+        return S.encryptor.encrypt(S.encoder.encode(arr));
+      });
+      kwLog(`    BFV 암호화 ${inputCts.length}개 (${(performance.now()-t0).toFixed(1)} ms)`);
+
+      // 서버 측 동형연산
+      kwLog(`===== SERVER (no sk) — pattern "${pat}" =====`);
+      const { target, mask } = buildKwTargetAndMask(parsed, S.slotCount);
+      const targetPlain = S.encoder.encode(target);
+      const maskPlain   = S.encoder.encode(mask);
+      const t1 = performance.now();
+      const resultCts = inputCts.map(ct => {
+        const diff = S.evaluator.subPlain(ct, targetPlain);
+        const sq   = S.evaluator.square(diff);
+        S.evaluator.relinearize(sq, S.relinKeys, sq);
+        return S.evaluator.multiplyPlain(sq, maskPlain);
+      });
+      kwLog(`    diff=ct-Plain(target); sq=diff*diff; out=sq*Plain(mask)  (${(performance.now()-t1).toFixed(1)} ms)`);
+
+      // 진단 (첫 후보의 noise budget)
+      try {
+        const b = S.decryptor.invariantNoiseBudget(resultCts[0]);
+        kwLog(`    (diagnostic) noise budget = ${b} bits${b < 10 ? ' ⚠ 너무 낮음' : ''}`);
+      } catch (_) {}
+
+      // 복호화
+      kwLog(`===== CLIENT — decrypt "${pat}" =====`);
+      const t2 = performance.now();
+      const items = resultCts.map((ct, i) => {
+        const plain = S.decryptor.decrypt(ct);
+        const arr = S.encoder.decode(plain);
+        const slots = Array.from(arr.slice(0, L));
+        const sum = slots.reduce((a, b) => a + Math.abs(b), 0);
+        return {
+          pattern: pat,
+          token: cands[i].text,
+          start: cands[i].start, end: cands[i].end,
+          L, sum, match: sum === 0,
+          inputCt: inputCts[i], resultCt: resultCts[i],
+        };
+      });
+      kwLog(`    복호화 완료 (${(performance.now()-t2).toFixed(1)} ms)`);
+
+      const hits = items.filter(it => it.match);
+      kwLog(`    결과: ${hits.length}/${items.length} match`);
+
+      allRows.push(...items);
+      allGroups.push({ pattern: pat, items });
+      bundlePatterns.push({
+        pattern: pat,
+        candidates: items.map((it, i) => ({
+          index: i,
+          token: it.token,
+          position: { start: it.start, end: it.end },
+          input_ciphertext_b64:        inputCts[i].save(),
+          server_result_ciphertext_b64: resultCts[i].save(),
+          decrypted_slot_sum: it.sum,
+          matched: it.match,
+        })),
+      });
+    }
+
+    // 결과 테이블
+    kwUI.table.innerHTML = allRows.length
+      ? allRows.map((r, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td><code class="mono">${escapeHtml(r.pattern)}</code></td>
+            <td><code class="mono">${escapeHtml(r.token)}</code></td>
+            <td class="num">${r.start}-${r.end}</td>
+            <td class="num">${r.sum}</td>
+            <td>${r.match
+              ? '<span class="pill ok">✓ MATCH</span>'
+              : '<span class="pill">no</span>'}</td>
+          </tr>`).join('')
+      : '<tr><td colspan="6" class="empty">길이가 일치하는 후보가 없습니다.</td></tr>';
+
+    const totalHits = allRows.filter(r => r.match).length;
+    kwUI.status.innerHTML = totalHits
+      ? `<span class="pill ok">${totalHits}개 매치</span>`
+      : '<span class="pill warn">매치 없음</span>';
+
+    refreshKwCiphersPanel(allGroups);
+
+    // 묶음 다운로드
+    _kwBundle = {
+      generated_at: new Date().toISOString(),
+      scheme: S.schemeName, poly_modulus_degree: S.polyDeg, slot_count: S.slotCount,
+      encryption_parameters_b64: S.parms.save(),
+      public_key_b64: S.publicKey.save(),
+      relin_keys_b64: S.relinKeys.save(),
+      patterns: bundlePatterns,
+    };
+    kwUI.bundleDl.disabled = !bundlePatterns.length;
+    kwUI.bundleInfo.innerHTML = bundlePatterns.length
+      ? `<span class="pill">${allRows.length}개 후보 ct + 결과 ct 묶음 준비됨</span>`
+      : '<span class="empty">후보가 없어 번들 미생성</span>';
+  } catch (e) {
+    kwLog('ERROR: ' + e.message);
+    alert('실행 실패: ' + e.message);
+  } finally {
+    kwUI.run.disabled = false;
+  }
 });
 </script>
 </body>

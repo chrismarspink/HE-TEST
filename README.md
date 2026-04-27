@@ -9,6 +9,7 @@
 | **PII Scanner** | 파일 드래그앤드롭 → 정규식 + 키워드 룰로 PII / 민감정보 감지 | Microsoft Presidio (또는 lite 버전: 순수 Python regex) |
 | **SEAL Demo**   | BFV/CKKS 스킴으로 벡터 암호화 → 암호문 상태로 +, −, ×, square, negate → 복호화 | node-seal (브라우저 WASM) |
 | **RRN Search (HE)** | 문서 안의 주민등록번호를 **복호화 없이** 동형연산으로 검색 (Exact / Pattern) | node-seal |
+| **Keyword Search (HE)** | 임의의 키워드/와일드카드 패턴(`*` = 한 글자) 을 토큰 단위로 HE 검색 | node-seal |
 
 📖 **`/docs`** 페이지 — 서버 실행 후 [http://127.0.0.1:5000/docs](http://127.0.0.1:5000/docs) — 동형암호 개념, 키 4종의 역할/보호 레벨, 노이즈 예산, 패턴 매칭 트릭을 정리한 설명 페이지.
 
