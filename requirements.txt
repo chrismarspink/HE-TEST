@@ -1,0 +1,8 @@
+# Python 3.11 또는 3.12 사용 권장 (3.13/3.14 는 spaCy/blis 미지원)
+Flask==3.0.3
+presidio-analyzer==2.2.355
+PyYAML==6.0.2
+pypdf==4.3.1
+python-docx==1.1.2
+spacy==3.7.5
+numpy<2.0

@@ -1,0 +1,108 @@
+# =============================================================================
+# 사용자 정의 패턴/룰 정의 파일
+# -----------------------------------------------------------------------------
+# 이 파일을 수정한 뒤 서버를 재시작하거나, 웹 UI 의 "Reload Patterns" 버튼을
+# 누르면 새 룰이 즉시 반영됩니다.
+#
+# 두 가지 종류의 인식기를 추가할 수 있습니다.
+#  1) pattern_recognizers : 정규식 기반
+#  2) deny_list_recognizers : 키워드 목록 기반
+# =============================================================================
+
+pattern_recognizers:
+
+  - name: KR_RRN                       # 한국 주민등록번호
+    supported_entity: KR_RRN
+    supported_language: en             # spaCy en_core_web_lg 사용 시 en 으로 둠
+    patterns:
+      - name: rrn_with_hyphen
+        regex: '\b\d{6}-[1-4]\d{6}\b'
+        score: 0.9
+      - name: rrn_no_hyphen
+        regex: '\b\d{6}[1-4]\d{6}\b'
+        score: 0.6
+    context:
+      - 주민등록번호
+      - 주민번호
+      - RRN
+
+  - name: KR_PHONE                     # 한국 휴대폰 번호
+    supported_entity: KR_PHONE
+    supported_language: en
+    patterns:
+      - name: mobile_with_hyphen
+        regex: '\b01[016-9]-\d{3,4}-\d{4}\b'
+        score: 0.85
+      - name: mobile_no_hyphen
+        regex: '\b01[016-9]\d{7,8}\b'
+        score: 0.5
+    context:
+      - 휴대폰
+      - 전화
+      - 연락처
+      - phone
+
+  - name: KR_BIZ_NO                    # 한국 사업자등록번호
+    supported_entity: KR_BIZ_NO
+    supported_language: en
+    patterns:
+      - name: biz_no
+        regex: '\b\d{3}-\d{2}-\d{5}\b'
+        score: 0.85
+    context:
+      - 사업자
+      - 사업자등록번호
+
+  - name: KR_PASSPORT                  # 한국 여권번호 (예: M12345678)
+    supported_entity: KR_PASSPORT
+    supported_language: en
+    patterns:
+      - name: passport_kr
+        regex: '\b[MSRODmsrod]\d{8}\b'
+        score: 0.6
+    context:
+      - 여권
+      - passport
+
+  - name: AWS_ACCESS_KEY               # AWS Access Key ID
+    supported_entity: AWS_ACCESS_KEY
+    supported_language: en
+    patterns:
+      - name: aws_access_key
+        regex: '\b(AKIA|ASIA)[0-9A-Z]{16}\b'
+        score: 0.95
+    context:
+      - aws
+      - access
+      - key
+
+  - name: GENERIC_API_KEY              # 일반적인 32자 이상 hex / base64 시크릿
+    supported_entity: GENERIC_API_KEY
+    supported_language: en
+    patterns:
+      - name: long_secret
+        regex: '\b[A-Za-z0-9_\-]{32,}\b'
+        score: 0.3
+    context:
+      - api_key
+      - secret
+      - token
+
+deny_list_recognizers:
+
+  - name: INTERNAL_PROJECTS
+    supported_entity: INTERNAL_PROJECT
+    supported_language: en
+    deny_list:
+      - ProjectAlpha
+      - ProjectOmega
+      - 프로젝트 사일런스
+    score: 0.9
+
+  - name: VIP_NAMES
+    supported_entity: VIP_PERSON
+    supported_language: en
+    deny_list:
+      - 홍길동
+      - 김철수
+    score: 0.85

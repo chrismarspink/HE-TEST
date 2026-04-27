@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.venv/
+venv/
+env/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project artifacts
+*.log
+*.b64.txt
+rrn_search_bundle.json
+ciphertext_*.txt
+public_key.*
+secret_key.*
+relin_keys.*
+encryption_parameters.*

@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>Presidio + SEAL Demo</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #181b22;
+    --line: #2a2f3a;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #4f8cff;
+    --hi: #ffd166;
+    --danger: #ef476f;
+    --ok: #06d6a0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  p.lead { margin: 0 0 20px; color: var(--muted); }
+  .row { display: flex; gap: 20px; flex-wrap: wrap; }
+  .col { flex: 1 1 420px; min-width: 320px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 18px; margin-bottom: 16px;
+  }
+  .card h2 { margin: 0 0 10px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em;}
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .tab-btn {
+    background: transparent; color: var(--muted); border: 0;
+    padding: 10px 18px; cursor: pointer; font-size: 14px;
+    border-bottom: 2px solid transparent;
+  }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  #drop {
+    border: 2px dashed var(--line); border-radius: 12px;
+    padding: 40px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #drop.hover { border-color: var(--accent); background: rgba(79,140,255,.08); }
+  #drop input { display: none; }
+  .controls { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+  button, .btn {
+    background: var(--accent); color: white; border: 0;
+    padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  button.secondary { background: #2a2f3a; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  label { color: var(--muted); font-size: 13px; }
+  input[type=number] {
+    width: 80px; background: #0f1115; color: var(--text);
+    border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+  }
+  input[type=text], textarea {
+    width: 100%; background: #0f1115; color: var(--text);
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: 8px 10px; font-family: ui-monospace, "Consolas", monospace; font-size: 13px;
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    background: rgba(79,140,255,.15); color: #9cc1ff; font-size: 12px;
+  }
+  .pill.warn { background: rgba(255,209,102,.15); color: var(--hi); }
+  .pill.bad  { background: rgba(239,71,111,.15); color: var(--danger); }
+  .pill.ok   { background: rgba(6,214,160,.15);  color: var(--ok); }
+  pre.preview, pre.log {
+    white-space: pre-wrap; word-break: break-word;
+    background: #0b0d12; border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px; max-height: 380px; overflow: auto; font-size: 13px; line-height: 1.55;
+  }
+  pre.log { font-family: ui-monospace,"Consolas",monospace; font-size: 12px; }
+  mark { background: rgba(255,209,102,.35); color: inherit; padding: 1px 2px; border-radius: 3px; }
+  mark[data-score-low]  { background: rgba(79,140,255,.25); }
+  mark[data-score-high] { background: rgba(239,71,111,.35); }
+  .summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .summary span { background: #0b0d12; border: 1px solid var(--line); padding: 4px 10px; border-radius: 999px; font-size: 12px;}
+  .empty { color: var(--muted); font-style: italic; }
+  .ser-row { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; background: #0b0d12; }
+  .ser-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .ser-label { font-weight: 600; min-width: 130px; }
+  .ser-size { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .ser-body { margin: 6px 0 0; padding: 8px; background: #07080c; font-family: ui-monospace,"Consolas",monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; border-radius: 4px;}
+  button.mini { padding: 3px 9px; font-size: 11px; }
+  .loader { display:none; color: var(--muted); font-size:13px; margin-top:8px;}
+  .loader.show { display: inline; }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .kv { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+  .kv span { background: #0b0d12; border: 1px solid var(--line); padding: 4px 10px; border-radius: 6px; }
+  .kv b { color: var(--text); }
+  .row-line { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;}
+  code.mono { font-family: ui-monospace,"Consolas",monospace; }
+</style>
+</head>
+<body>
+
+<h1>PII Scanner & Microsoft SEAL Demo</h1>
+<p class="lead">Presidio 로 민감정보를 감지하고, Microsoft SEAL 동형암호로 데이터를 보호한 채 연산해봅니다.</p>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="scanner">PII Scanner</button>
+  <button class="tab-btn" data-tab="seal">SEAL (Homomorphic Encryption)</button>
+  <button class="tab-btn" data-tab="rrn">RRN Search (HE)</button>
+</div>
+
+<!-- ========================= TAB 1 : PII SCANNER ========================= -->
+<div id="tab-scanner" class="tab-panel active">
+<div class="row">
+
+  <div class="col">
+    <div class="card">
+      <h2>1. 파일 업로드</h2>
+      <div id="drop">
+        <div><b>여기에 파일을 드롭</b> 하거나 클릭해서 선택</div>
+        <div style="color:var(--muted); font-size:12px; margin-top:6px;">
+          .txt, .log, .csv, .json, .md, .pdf, .docx 지원 (최대 32MB)
+        </div>
+        <input id="file" type="file" />
+      </div>
+      <div class="controls">
+        <label>Score threshold
+          <input id="threshold" type="number" step="0.05" min="0" max="1" value="0.3" />
+        </label>
+        <button class="secondary" id="reload">Reload Patterns</button>
+        <button class="secondary" id="show-rec">Show Recognizers</button>
+        <span class="loader" id="loader">분석 중...</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>요약</h2>
+      <div class="summary" id="summary"><span class="empty">아직 분석 결과 없음</span></div>
+      <table id="table">
+        <thead>
+          <tr>
+            <th>#</th><th>Entity</th><th>Match</th>
+            <th class="num">Start</th><th class="num">End</th>
+            <th class="num">Score</th><th>Recognizer</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h2>본문 미리보기 (감지된 부분 하이라이트)</h2>
+      <pre id="preview" class="preview"><span class="empty">파일을 업로드하면 미리보기가 표시됩니다.</span></pre>
+    </div>
+
+    <div class="card">
+      <h2>활성 인식기</h2>
+      <div id="recognizers"><span class="empty">"Show Recognizers" 클릭</span></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ========================= TAB 2 : SEAL ========================= -->
+<div id="tab-seal" class="tab-panel">
+<div class="row">
+
+  <div class="col">
+    <div class="card">
+      <h2>SEAL 컨텍스트</h2>
+      <div class="kv" id="seal-status">
+        <span>상태: <b id="seal-state">로드 대기</b></span>
+      </div>
+      <div class="row-line">
+        <label>Scheme
+          <select id="seal-scheme">
+            <option value="bfv" selected>BFV (정수 - 정확한 연산)</option>
+            <option value="ckks">CKKS (실수 - 근사 연산)</option>
+          </select>
+        </label>
+        <label>poly_modulus_degree
+          <select id="seal-poly">
+            <option>2048</option>
+            <option selected>4096</option>
+            <option>8192</option>
+            <option>16384</option>
+          </select>
+        </label>
+        <button id="seal-init">Initialize / Reset</button>
+      </div>
+      <details><summary>SEAL 이란?</summary>
+        <p style="color:var(--muted); font-size:13px;">
+          Microsoft SEAL 은 동형암호(Homomorphic Encryption) 라이브러리입니다.
+          데이터를 <b>복호화하지 않은 상태로</b> 덧셈/뺄셈/곱셈 등의 연산을 수행할 수 있어
+          개인정보를 외부 서버에 노출하지 않고 처리하는 시나리오에 사용됩니다.
+          이 데모는 브라우저(node-seal WASM) 에서 모든 키 생성/암호화/연산을 수행합니다.
+        </p>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>1. 평문 입력 → 암호화</h2>
+      <label>Vector A (콤마 구분)</label>
+      <input id="seal-input-a" type="text" value="5, 10, 15, 20" />
+      <div class="row-line">
+        <button id="seal-enc-a" disabled>Encrypt A</button>
+        <span id="seal-info-a" class="empty">암호화 전</span>
+      </div>
+
+      <label style="margin-top:14px; display:block;">Vector B (콤마 구분)</label>
+      <input id="seal-input-b" type="text" value="1, 2, 3, 4" />
+      <div class="row-line">
+        <button id="seal-enc-b" disabled>Encrypt B</button>
+        <span id="seal-info-b" class="empty">암호화 전</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2. 암호문에 직접 연산</h2>
+      <div class="row-line">
+        <label><input type="radio" name="seal-op" value="add" checked> Add (A + B)</label>
+        <label><input type="radio" name="seal-op" value="sub"> Sub (A − B)</label>
+        <label><input type="radio" name="seal-op" value="mul"> Multiply (A × B)</label>
+        <label><input type="radio" name="seal-op" value="square"> Square (A²)</label>
+        <label><input type="radio" name="seal-op" value="negate"> Negate (−A)</label>
+      </div>
+      <div class="row-line">
+        <button id="seal-compute" disabled>Compute on Ciphertexts</button>
+        <span id="seal-info-result" class="empty">아직 결과 없음</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>3. 복호화 & 검증</h2>
+      <div class="row-line">
+        <button id="seal-decrypt" disabled>Decrypt Result</button>
+      </div>
+      <table style="margin-top:8px;">
+        <tbody>
+          <tr><th style="width:140px;">Decrypted</th>
+              <td><code class="mono" id="seal-dec">-</code></td></tr>
+          <tr><th>Expected (plaintext)</th>
+              <td><code class="mono" id="seal-exp">-</code></td></tr>
+          <tr><th>Match</th>
+              <td id="seal-match"><span class="empty">-</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h2>파라미터</h2>
+      <div class="kv" id="seal-params">
+        <span class="empty">초기화되면 표시됩니다.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>키 (Keys)</h2>
+      <p style="color:var(--muted); font-size:12px; margin:4px 0 8px;">
+        모두 base64 직렬화 (<code class="mono">save()</code>) 결과입니다. 비밀키는 실서비스에서 <b>절대 외부로 유출 금지</b>.
+      </p>
+      <div id="seal-keys"><span class="empty">초기화 후 표시됩니다.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>암호문 (Ciphertexts)</h2>
+      <div id="seal-ciphers"><span class="empty">암호화 후 표시됩니다.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>실행 로그</h2>
+      <pre class="log" id="seal-log"></pre>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ========================= TAB 3 : RRN SEARCH (HE) ========================= -->
+<div id="tab-rrn" class="tab-panel">
+<div class="row">
+
+  <div class="col">
+    <div class="card">
+      <h2>이 데모가 보여주는 것</h2>
+      <p style="color:var(--muted); font-size:13px; margin:4px 0 0;">
+        문서 내부에 특정 <b>주민등록번호</b>가 들어있는지를, <b>문서를 복호화하지 않고</b> 동형암호 연산만으로 검사합니다.
+        후보 RRN 들은 클라이언트에서 13자리 숫자 벡터로 BFV 암호화되어 서버로 전달되고,
+        서버는 비밀키 없이 <code class="mono">(ct − target)²</code> 만 계산해 결과 암호문을 돌려줍니다.
+        클라이언트만이 결과를 복호화할 수 있고, 13개 슬롯이 모두 0 이면 일치(MATCH) 입니다.
+      </p>
+      <p style="color:var(--muted); font-size:12px; margin-top:8px;">
+        ※ <b>BFV</b> 스킴이 필요합니다. SEAL 탭이 아직 초기화되지 않았다면 자동으로 BFV/4096 으로 초기화됩니다.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>1. 입력</h2>
+      <label>Mode</label>
+      <div class="row-line" style="margin-top:4px;">
+        <label><input type="radio" name="rrn-mode" value="exact" checked> Exact match — 특정 RRN 일치</label>
+        <label><input type="radio" name="rrn-mode" value="pattern"> Pattern match — RRN 형식(성별자리 ∈ {1..4})</label>
+      </div>
+
+      <label style="margin-top:10px; display:block;">Document (RRN 후보를 포함할 수 있는 텍스트)</label>
+      <textarea id="rrn-doc" rows="10">[고객 명단]
+홍길동: 901231-1234567
+김철수: 850506-2345678
+이영희: 920724-2876543
+
+[검증 대상]
+가짜RRN(성별=7): 123456-7234567
+계좌번호 13자리: 1234567890123
+14자리 잡음: 12345678901234
+</textarea>
+
+      <label style="margin-top:10px; display:block;">Target RRN <span style="color:var(--muted);">(Exact 모드일 때만 사용)</span></label>
+      <input id="rrn-target" type="text" value="850506-2345678" />
+
+      <div class="row-line">
+        <button id="rrn-run">Run Encrypted Search</button>
+        <span id="rrn-status" class="empty">대기 중</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2. 결과</h2>
+      <table id="rrn-table">
+        <thead><tr>
+          <th>#</th><th>위치</th><th>후보</th><th class="num"><span id="rrn-col">검사값</span></th><th>결과</th>
+        </tr></thead>
+        <tbody><tr><td colspan="5" class="empty">실행 후 표시됩니다.</td></tr></tbody>
+      </table>
+      <p style="color:var(--muted); font-size:12px; margin-top:8px;" id="rrn-help">
+        Exact: 13개 슬롯의 절댓값 합 (0 → MATCH). · Pattern: (g-1)(g-2)(g-3)(g-4) 의 슬롯 6 값 (0 → 유효한 RRN 형식).
+      </p>
+      <div class="row-line">
+        <button class="secondary" id="rrn-bundle-dl" disabled>Download bundle (JSON, 모든 ct)</button>
+        <span id="rrn-bundle-info" class="empty">실행 후 활성화</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h2>프라이버시 경계</h2>
+<pre style="background:#0b0d12; border:1px solid var(--line); border-radius:8px; padding:12px; font-size:12px; line-height:1.6; color:var(--muted); overflow-x:auto;">
+[ EXACT MATCH ]
+┌─────────── CLIENT ───────────┐
+│ regex /\d{6}-?[1-4]\d{6}/g    │
+│ 각 후보 → [d0..d12] → BFV enc │
+└──────────────↓────────────────┘
+┌─────────── SERVER (no sk) ────┐
+│ diff = ct - Plain(target)     │
+│ sq   = diff * diff            │
+│ relinearize                   │
+└──────────────↓────────────────┘
+┌─────────── CLIENT ───────────┐
+│ 슬롯 0..12 합 = 0  ⇒  MATCH   │
+└──────────────────────────────┘
+
+[ PATTERN MATCH ]
+┌─────────── CLIENT ───────────┐
+│ regex /\d{6}-?\d{7}/g         │
+│ (성별 자리 필터링 X — 모두 통과) │
+│ 각 후보 → [d0..d12] → BFV enc │
+└──────────────↓────────────────┘
+┌─────────── SERVER (no sk) ────┐
+│ d1 = ct - 1   d2 = ct - 2     │
+│ d3 = ct - 3   d4 = ct - 4     │
+│ m12 = d1 * d2  (depth 1)      │
+│ m34 = d3 * d4  (depth 1)      │
+│ p   = m12 * m34 (depth 2)     │
+│ → p(g)=(g-1)(g-2)(g-3)(g-4)   │
+└──────────────↓────────────────┘
+┌─────────── CLIENT ───────────┐
+│ 슬롯 6 의 값 = 0              │
+│   ⇒ 성별자리 ∈ {1,2,3,4}      │
+│   ⇒ 유효한 RRN 형식           │
+└──────────────────────────────┘
+</pre>
+    </div>
+
+    <div class="card">
+      <h2>실행 로그</h2>
+      <pre class="log" id="rrn-log"></pre>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- node-seal (Microsoft SEAL WASM) -->
+<script src="https://unpkg.com/node-seal@5.1.5/throws_wasm_web_umd.js"></script>
+
+<script>
+/* ========================= TAB 전환 ========================= */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if ((btn.dataset.tab === 'seal' || btn.dataset.tab === 'rrn') && !sealReady) initSeal();
+  });
+});
+
+/* ========================= TAB 1 : PII SCANNER ========================= */
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+const threshold = document.getElementById('threshold');
+const loader = document.getElementById('loader');
+
+['dragenter','dragover'].forEach(ev =>
+  drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hover'); }));
+['dragleave','drop'].forEach(ev =>
+  drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hover'); }));
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('drop', e => {
+  if (e.dataTransfer.files.length) analyze(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) analyze(e.target.files[0]);
+});
+
+document.getElementById('reload').addEventListener('click', async () => {
+  const res = await fetch('/api/reload', { method: 'POST' });
+  const j = await res.json();
+  alert(j.message || JSON.stringify(j));
+});
+
+document.getElementById('show-rec').addEventListener('click', async () => {
+  const res = await fetch('/api/recognizers');
+  const j = await res.json();
+  document.getElementById('recognizers').innerHTML = `
+    <p>총 <b>${j.recognizer_count}</b>개 인식기 / 지원 엔티티 <b>${j.supported_entities.length}</b>개</p>
+    <details><summary>지원 엔티티 보기</summary>
+      <p style="color:var(--muted);font-size:12px;">${j.supported_entities.join(', ')}</p>
+    </details>
+    <details><summary>인식기 목록 보기</summary>
+      <table><thead><tr><th>Name</th><th>Entities</th><th>Lang</th></tr></thead>
+      <tbody>${j.recognizers.map(r =>
+        `<tr><td>${r.name}</td><td>${r.supported_entities.join(', ')}</td><td>${r.supported_language}</td></tr>`
+      ).join('')}</tbody></table>
+    </details>`;
+});
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function highlight(text, findings) {
+  if (!findings.length) return escapeHtml(text);
+  const sorted = [...findings].sort((a,b) => a.start - b.start || b.end - a.end);
+  const used = [];
+  for (const f of sorted) {
+    if (!used.length || f.start >= used[used.length-1].end) used.push(f);
+  }
+  let out = '', cur = 0;
+  for (const f of used) {
+    out += escapeHtml(text.slice(cur, f.start));
+    const cls = f.score >= 0.85 ? 'data-score-high' : (f.score < 0.5 ? 'data-score-low' : '');
+    out += `<mark ${cls} title="${escapeHtml(f.entity_type)} (${f.score})">${escapeHtml(text.slice(f.start, f.end))}</mark>`;
+    cur = f.end;
+  }
+  out += escapeHtml(text.slice(cur));
+  return out;
+}
+
+async function analyze(file) {
+  loader.classList.add('show');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('score_threshold', threshold.value);
+    const res = await fetch('/api/analyze', { method: 'POST', body: fd });
+    const j = await res.json();
+    if (!j.ok) { alert(j.message); return; }
+    render(j);
+  } catch (e) { alert('분석 실패: ' + e); }
+  finally { loader.classList.remove('show'); }
+}
+
+function render(j) {
+  const sum = document.getElementById('summary');
+  const entries = Object.entries(j.summary);
+  sum.innerHTML = entries.length
+    ? `<span><b>${j.filename}</b> · ${j.char_count.toLocaleString()} chars · threshold ${j.score_threshold}</span>` +
+      entries.map(([k,v]) => `<span>${k}: <b>${v}</b></span>`).join('')
+    : `<span><b>${j.filename}</b> · 감지된 항목 없음</span>`;
+
+  const tbody = document.querySelector('#table tbody');
+  tbody.innerHTML = j.findings.map((f,i) => {
+    const cls = f.score >= 0.85 ? 'bad' : (f.score < 0.5 ? '' : 'warn');
+    return `<tr>
+      <td>${i+1}</td>
+      <td><span class="pill ${cls}">${f.entity_type}</span></td>
+      <td><code>${escapeHtml(f.text)}</code></td>
+      <td class="num">${f.start}</td>
+      <td class="num">${f.end}</td>
+      <td class="num">${f.score}</td>
+      <td>${f.recognizer || ''}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="7" class="empty">감지된 엔티티 없음</td></tr>`;
+
+  document.getElementById('preview').innerHTML = highlight(j.text, j.findings);
+}
+
+/* ========================= TAB 2 : SEAL DEMO ========================= */
+const sealUI = {
+  state:   document.getElementById('seal-state'),
+  init:    document.getElementById('seal-init'),
+  scheme:  document.getElementById('seal-scheme'),
+  poly:    document.getElementById('seal-poly'),
+  inA:     document.getElementById('seal-input-a'),
+  inB:     document.getElementById('seal-input-b'),
+  encA:    document.getElementById('seal-enc-a'),
+  encB:    document.getElementById('seal-enc-b'),
+  infoA:   document.getElementById('seal-info-a'),
+  infoB:   document.getElementById('seal-info-b'),
+  compute: document.getElementById('seal-compute'),
+  infoR:   document.getElementById('seal-info-result'),
+  decrypt: document.getElementById('seal-decrypt'),
+  dec:     document.getElementById('seal-dec'),
+  exp:     document.getElementById('seal-exp'),
+  match:   document.getElementById('seal-match'),
+  params:  document.getElementById('seal-params'),
+  log:     document.getElementById('seal-log'),
+};
+
+let sealReady = false;
+let S = {}; // SEAL 컨텍스트 보관
+
+function sLog(msg) {
+  const t = new Date().toTimeString().slice(0, 8);
+  sealUI.log.textContent += `[${t}] ${msg}\n`;
+  sealUI.log.scrollTop = sealUI.log.scrollHeight;
+}
+
+function setSealState(s) { sealUI.state.textContent = s; }
+
+function parseInputBFV(s) {
+  return s.split(',').map(x => parseInt(x.trim(), 10)).filter(n => !Number.isNaN(n));
+}
+function parseInputCKKS(s) {
+  return s.split(',').map(x => parseFloat(x.trim())).filter(n => !Number.isNaN(n));
+}
+
+function expectPlain(op, A, B) {
+  const len = Math.max(A.length, B.length);
+  const a = i => (i < A.length ? A[i] : 0);
+  const b = i => (i < B.length ? B[i] : 0);
+  const out = [];
+  for (let i = 0; i < len; i++) {
+    switch (op) {
+      case 'add':    out.push(a(i) + b(i)); break;
+      case 'sub':    out.push(a(i) - b(i)); break;
+      case 'mul':    out.push(a(i) * b(i)); break;
+      case 'square': out.push(a(i) * a(i)); break;
+      case 'negate': out.push(-a(i)); break;
+    }
+  }
+  return out;
+}
+
+async function initSeal() {
+  try {
+    setSealState('SEAL WASM 로드 중...');
+    sealUI.init.disabled = true;
+    sealUI.encA.disabled = sealUI.encB.disabled = true;
+    sealUI.compute.disabled = sealUI.decrypt.disabled = true;
+
+    const SEALCtor = window.SEAL || window.nodeSEAL;
+    if (!SEALCtor) throw new Error('node-seal 라이브러리를 불러오지 못했습니다 (네트워크 확인).');
+    const seal = await SEALCtor();
+    sLog('SEAL WASM loaded');
+
+    const schemeName = sealUI.scheme.value;
+    const polyDeg = parseInt(sealUI.poly.value, 10);
+    const securityLevel = seal.SecurityLevel.tc128;
+    const schemeType = (schemeName === 'bfv') ? seal.SchemeType.bfv : seal.SchemeType.ckks;
+
+    const parms = seal.EncryptionParameters(schemeType);
+    parms.setPolyModulusDegree(polyDeg);
+
+    let scale = null;
+    if (schemeName === 'bfv') {
+      parms.setCoeffModulus(seal.CoeffModulus.BFVDefault(polyDeg));
+      parms.setPlainModulus(seal.PlainModulus.Batching(polyDeg, 20));
+    } else {
+      // CKKS: 일반적인 비트 사이즈 구성
+      const bits = polyDeg >= 8192 ? Int32Array.from([60, 40, 40, 60])
+                                   : Int32Array.from([40, 20, 40]);
+      parms.setCoeffModulus(seal.CoeffModulus.Create(polyDeg, bits));
+      scale = Math.pow(2, 20);
+    }
+
+    const context = seal.Context(parms, true, securityLevel);
+    if (!context.parametersSet()) throw new Error('Encryption parameters are NOT valid');
+
+    const keyGen = seal.KeyGenerator(context);
+    const publicKey = keyGen.createPublicKey();
+    const secretKey = keyGen.secretKey();
+    const relinKeys = keyGen.createRelinKeys();
+
+    S = {
+      seal, schemeName, polyDeg, scale, context,
+      parms, publicKey, secretKey, relinKeys,
+      encryptor: seal.Encryptor(context, publicKey),
+      decryptor: seal.Decryptor(context, secretKey),
+      evaluator: seal.Evaluator(context),
+      encoder:   (schemeName === 'bfv')
+                  ? seal.BatchEncoder(context)
+                  : seal.CKKSEncoder(context),
+      ctA: null, ctB: null, ctR: null,
+      lastOp: null, expected: null,
+    };
+    S.slotCount = S.encoder.slotCount;
+
+    sealReady = true;
+    setSealState(`준비 완료 · ${schemeName.toUpperCase()}`);
+    sealUI.params.innerHTML = `
+      <span>scheme <b>${schemeName.toUpperCase()}</b></span>
+      <span>poly_modulus_degree <b>${polyDeg.toLocaleString()}</b></span>
+      <span>security <b>128-bit</b></span>
+      <span>slot_count <b>${S.slotCount.toLocaleString()}</b></span>
+      ${scale ? `<span>scale <b>2^20</b></span>` : ''}`;
+
+    sealUI.encA.disabled = sealUI.encB.disabled = false;
+    refreshKeysPanel();
+    refreshCiphersPanel();
+    sLog(`Initialized · ${schemeName.toUpperCase()}, poly=${polyDeg}, slots=${S.slotCount}`);
+  } catch (e) {
+    setSealState('초기화 실패');
+    sLog('ERROR: ' + e.message);
+    alert('SEAL 초기화 실패: ' + e.message);
+  } finally {
+    sealUI.init.disabled = false;
+  }
+}
+
+function encodeVector(values) {
+  if (S.schemeName === 'bfv') {
+    const arr = new Int32Array(S.slotCount);
+    values.forEach((v, i) => { if (i < S.slotCount) arr[i] = v | 0; });
+    return S.encoder.encode(arr);
+  } else {
+    const arr = Float64Array.from(values);
+    return S.encoder.encode(arr, S.scale);
+  }
+}
+
+function decodeVector(plain, n) {
+  if (S.schemeName === 'bfv') {
+    const out = S.encoder.decode(plain);  // Int32Array
+    return Array.from(out.slice(0, n));
+  } else {
+    const out = S.encoder.decode(plain);  // Float64Array
+    return Array.from(out.slice(0, n)).map(v => Math.round(v * 1e4) / 1e4);
+  }
+}
+
+function cipherPreview(cipher) {
+  const b64 = cipher.save();
+  return b64.slice(0, 200) + (b64.length > 200 ? ' …' : '');
+}
+
+/* ==================== 직렬화 / 다운로드 헬퍼 ==================== */
+const _serStore = {};   // id → { label, b64, filename }
+let _serSeq = 0;
+
+function copyToClip(text) {
+  navigator.clipboard.writeText(text).then(
+    () => sLog(`클립보드에 복사 (${text.length.toLocaleString()} chars)`),
+    e  => alert('Copy failed: ' + e)
+  );
+}
+
+function downloadText(filename, content) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+}
+
+function renderSerRow(label, savable, filename, warn) {
+  if (!savable) {
+    return `<div class="ser-row"><div class="ser-head">
+      <span class="ser-label">${escapeHtml(label)}</span>
+      <span class="empty">아직 생성되지 않음</span>
+    </div></div>`;
+  }
+  let b64;
+  try { b64 = savable.save(); }
+  catch (e) {
+    return `<div class="ser-row"><div class="ser-head">
+      <span class="ser-label">${escapeHtml(label)}</span>
+      <span class="empty">save() 실패: ${escapeHtml(e.message)}</span>
+    </div></div>`;
+  }
+  const id = 'ser-' + (++_serSeq);
+  _serStore[id] = { label, b64, filename };
+  const head = b64.slice(0, 1000);
+  const tailNote = b64.length > 1000
+    ? `\n… (전체 ${b64.length.toLocaleString()} chars · "Download" 로 모두 저장)`
+    : '';
+  return `
+    <div class="ser-row">
+      <div class="ser-head">
+        <span class="ser-label">${escapeHtml(label)}</span>
+        ${warn ? '<span class="pill bad">SECRET</span>' : ''}
+        <span class="ser-size">${b64.length.toLocaleString()} chars (b64)</span>
+        <button class="secondary mini" data-act="toggle" data-id="${id}">Show / Hide</button>
+        <button class="secondary mini" data-act="copy"   data-id="${id}">Copy</button>
+        <button class="secondary mini" data-act="dl"     data-id="${id}">Download</button>
+      </div>
+      <pre class="ser-body" id="${id}-body" hidden>${escapeHtml(head)}${escapeHtml(tailNote)}</pre>
+    </div>`;
+}
+
+function attachSerHandlers(rootEl) {
+  rootEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const item = _serStore[btn.dataset.id];
+    if (!item) return;
+    if (btn.dataset.act === 'toggle') {
+      const body = document.getElementById(btn.dataset.id + '-body');
+      if (body) body.hidden = !body.hidden;
+    } else if (btn.dataset.act === 'copy') {
+      copyToClip(item.b64);
+    } else if (btn.dataset.act === 'dl') {
+      downloadText(item.filename, item.b64);
+    }
+  });
+}
+
+function refreshKeysPanel() {
+  const target = document.getElementById('seal-keys');
+  if (!target) return;
+  if (!sealReady) {
+    target.innerHTML = '<span class="empty">초기화 후 표시됩니다.</span>';
+    return;
+  }
+  target.innerHTML = [
+    renderSerRow('Encryption Parameters', S.parms,     'encryption_parameters.b64.txt', false),
+    renderSerRow('Public Key',            S.publicKey, 'public_key.b64.txt',           false),
+    renderSerRow('Secret Key',            S.secretKey, 'secret_key.b64.txt',           true ),
+    renderSerRow('Relin Keys',            S.relinKeys, 'relin_keys.b64.txt',           false),
+  ].join('');
+}
+
+function refreshCiphersPanel() {
+  const target = document.getElementById('seal-ciphers');
+  if (!target) return;
+  if (!sealReady) { target.innerHTML = '<span class="empty">SEAL 미초기화</span>'; return; }
+  if (!S.ctA && !S.ctB && !S.ctR) {
+    target.innerHTML = '<span class="empty">암호화 후 표시됩니다.</span>';
+    return;
+  }
+  target.innerHTML = [
+    S.ctA ? renderSerRow('Ciphertext A',      S.ctA, 'ciphertext_A.b64.txt',      false) : '',
+    S.ctB ? renderSerRow('Ciphertext B',      S.ctB, 'ciphertext_B.b64.txt',      false) : '',
+    S.ctR ? renderSerRow('Ciphertext Result', S.ctR, 'ciphertext_result.b64.txt', false) : '',
+  ].filter(Boolean).join('');
+}
+
+// 위 두 패널 컨테이너에 한 번만 클릭 위임 핸들러를 부착
+(function bindPanels() {
+  ['seal-keys', 'seal-ciphers'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) attachSerHandlers(el);
+  });
+})();
+
+function getInputs() {
+  const parser = (S.schemeName === 'bfv') ? parseInputBFV : parseInputCKKS;
+  return { A: parser(sealUI.inA.value), B: parser(sealUI.inB.value) };
+}
+
+sealUI.init.addEventListener('click', initSeal);
+
+sealUI.encA.addEventListener('click', () => {
+  if (!sealReady) return;
+  const { A } = getInputs();
+  if (!A.length) { alert('A 가 비어있습니다.'); return; }
+  const t0 = performance.now();
+  const plain = encodeVector(A);
+  S.ctA = S.encryptor.encrypt(plain);
+  const dt = (performance.now() - t0).toFixed(1);
+  sealUI.infoA.innerHTML = `<span class="pill ok">Encrypted</span> ${A.length}개 값, ${dt} ms`;
+  refreshCiphersPanel();
+  sLog(`Encrypted A (${A.length} values) in ${dt} ms`);
+  if (S.ctA && S.ctB) sealUI.compute.disabled = false;
+});
+
+sealUI.encB.addEventListener('click', () => {
+  if (!sealReady) return;
+  const { B } = getInputs();
+  if (!B.length) { alert('B 가 비어있습니다.'); return; }
+  const t0 = performance.now();
+  const plain = encodeVector(B);
+  S.ctB = S.encryptor.encrypt(plain);
+  const dt = (performance.now() - t0).toFixed(1);
+  sealUI.infoB.innerHTML = `<span class="pill ok">Encrypted</span> ${B.length}개 값, ${dt} ms`;
+  refreshCiphersPanel();
+  sLog(`Encrypted B (${B.length} values) in ${dt} ms`);
+  if (S.ctA && S.ctB) sealUI.compute.disabled = false;
+});
+
+sealUI.compute.addEventListener('click', () => {
+  if (!sealReady) return;
+  const op = document.querySelector('input[name="seal-op"]:checked').value;
+  const needB = (op === 'add' || op === 'sub' || op === 'mul');
+  if (!S.ctA) { alert('먼저 A 를 암호화하세요.'); return; }
+  if (needB && !S.ctB) { alert('먼저 B 를 암호화하세요.'); return; }
+
+  try {
+    const t0 = performance.now();
+    let result;
+    switch (op) {
+      case 'add':    result = S.evaluator.add(S.ctA, S.ctB); break;
+      case 'sub':    result = S.evaluator.sub(S.ctA, S.ctB); break;
+      case 'mul':
+        result = S.evaluator.multiply(S.ctA, S.ctB);
+        S.evaluator.relinearize(result, S.relinKeys, result);
+        if (S.schemeName === 'ckks') S.evaluator.rescaleToNext(result, result);
+        break;
+      case 'square':
+        result = S.evaluator.square(S.ctA);
+        S.evaluator.relinearize(result, S.relinKeys, result);
+        if (S.schemeName === 'ckks') S.evaluator.rescaleToNext(result, result);
+        break;
+      case 'negate': result = S.evaluator.negate(S.ctA); break;
+    }
+    const dt = (performance.now() - t0).toFixed(1);
+    S.ctR = result;
+    S.lastOp = op;
+
+    const { A, B } = getInputs();
+    S.expected = expectPlain(op, A, B);
+    sealUI.exp.textContent = JSON.stringify(S.expected);
+    refreshCiphersPanel();
+    sealUI.infoR.innerHTML = `<span class="pill ok">Op done</span> ${op.toUpperCase()}, ${dt} ms`;
+    sealUI.decrypt.disabled = false;
+    sLog(`Computed ${op.toUpperCase()} in ${dt} ms (ciphertext is still encrypted)`);
+  } catch (e) {
+    sLog('ERROR: ' + e.message);
+    alert('연산 실패: ' + e.message);
+  }
+});
+
+sealUI.decrypt.addEventListener('click', () => {
+  if (!sealReady || !S.ctR) return;
+  try {
+    const t0 = performance.now();
+    const plainR = S.decryptor.decrypt(S.ctR);
+    const n = S.expected.length;
+    const decoded = decodeVector(plainR, n);
+    const dt = (performance.now() - t0).toFixed(1);
+
+    sealUI.dec.textContent = JSON.stringify(decoded);
+
+    let ok;
+    if (S.schemeName === 'bfv') {
+      ok = decoded.length === S.expected.length &&
+           decoded.every((v, i) => v === S.expected[i]);
+    } else {
+      ok = decoded.length === S.expected.length &&
+           decoded.every((v, i) => Math.abs(v - S.expected[i]) < 0.05);
+    }
+    sealUI.match.innerHTML = ok
+      ? `<span class="pill ok">✓ MATCH</span> 평문 결과와 일치합니다.`
+      : `<span class="pill bad">✗ MISMATCH</span> 노이즈 또는 파라미터 한계일 수 있습니다.`;
+    sLog(`Decrypted in ${dt} ms · result=${JSON.stringify(decoded)} · ${ok ? 'OK' : 'MISMATCH'}`);
+  } catch (e) {
+    sLog('ERROR: ' + e.message);
+    alert('복호화 실패: ' + e.message);
+  }
+});
+
+/* ========================= TAB 3 : RRN SEARCH (HE) ========================= */
+const rrnUI = {
+  doc:    document.getElementById('rrn-doc'),
+  target: document.getElementById('rrn-target'),
+  run:    document.getElementById('rrn-run'),
+  status: document.getElementById('rrn-status'),
+  table:  document.querySelector('#rrn-table tbody'),
+  log:    document.getElementById('rrn-log'),
+  bundleDl:   document.getElementById('rrn-bundle-dl'),
+  bundleInfo: document.getElementById('rrn-bundle-info'),
+};
+let _rrnBundle = null;
+rrnUI.bundleDl.addEventListener('click', () => {
+  if (!_rrnBundle) return;
+  downloadText('rrn_search_bundle.json', JSON.stringify(_rrnBundle, null, 2));
+});
+
+function rLog(msg) {
+  const t = new Date().toTimeString().slice(0, 8);
+  rrnUI.log.textContent += `[${t}] ${msg}\n`;
+  rrnUI.log.scrollTop = rrnUI.log.scrollHeight;
+}
+
+function extractRRNCandidates(text, mode) {
+  // exact: 표준 RRN 패턴(성별자리 1~4 만)으로 사전 필터
+  // pattern: 13자리 숫자 시퀀스를 모두 후보로 (성별자리 검증은 서버에서 동형으로)
+  const re = (mode === 'exact')
+    ? /(?<!\d)\d{6}-?[1-4]\d{6}(?!\d)/g
+    : /(?<!\d)\d{6}-?\d{7}(?!\d)/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const raw = m[0];
+    const digits = raw.replace(/-/g, '').split('').map(Number);
+    out.push({ start: m.index, end: m.index + raw.length, raw, digits });
+  }
+  return out;
+}
+
+function digitsToInt32Vec(digits, slotCount) {
+  const arr = new Int32Array(slotCount);
+  for (let i = 0; i < digits.length && i < slotCount; i++) arr[i] = digits[i] | 0;
+  return arr;
+}
+
+async function ensureSealForRRN() {
+  // Pattern 모드는 깊이-2 곱셈이라 4096 의 noise budget 으로는 부족 → 8192 강제
+  const minPoly = 8192;
+
+  if (sealReady && S.schemeName === 'bfv' && S.polyDeg >= minPoly) return true;
+
+  let reason;
+  if (!sealReady) {
+    reason = `SEAL 미초기화 → BFV/${minPoly} 으로 자동 초기화`;
+  } else if (S.schemeName !== 'bfv') {
+    if (!confirm('현재 SEAL 컨텍스트가 CKKS 입니다. RRN 검색을 위해 BFV 로 재초기화 할까요?')) return false;
+    reason = `BFV/${minPoly} 으로 재초기화 (CKKS → BFV)`;
+  } else {
+    if (!confirm(`현재 poly_modulus_degree=${S.polyDeg}. Pattern 모드의 곱셈 깊이 2 를 위해 ${minPoly} 으로 재초기화 할까요?`)) return false;
+    reason = `BFV/${minPoly} 으로 재초기화 (noise budget 확보)`;
+  }
+  rLog(reason);
+
+  sealUI.scheme.value = 'bfv';
+  sealUI.poly.value = String(minPoly);
+  await initSeal();
+  // 새 컨텍스트가 됐으니 패턴 검사용 plaintext 캐시 무효화
+  _patternConsts = null;
+  return sealReady && S.schemeName === 'bfv' && S.polyDeg >= minPoly;
+}
+
+/* ---- 패턴(다항식) 검사용 상수 plaintext 캐시 ---- */
+let _patternConsts = null;
+function getPatternConsts() {
+  if (_patternConsts && _patternConsts.slot === S.slotCount) return _patternConsts;
+  const make = (v) => S.encoder.encode(
+    Int32Array.from({ length: S.slotCount }, () => v));
+  _patternConsts = {
+    slot: S.slotCount,
+    one:  make(1),
+    two:  make(2),
+    three:make(3),
+    four: make(4),
+  };
+  return _patternConsts;
+}
+
+/* 서버 측 동형 패턴 검사: 각 ct 에 대해 p(d) = (d-1)(d-2)(d-3)(d-4)
+   결과의 슬롯 6 (성별자리) 만 클라이언트가 검사 → 0 이면 유효 RRN 형식 */
+function serverPatternCheck(ciphertexts) {
+  const C = getPatternConsts();
+  return ciphertexts.map(ct => {
+    const d1 = S.evaluator.subPlain(ct, C.one);
+    const d2 = S.evaluator.subPlain(ct, C.two);
+    const d3 = S.evaluator.subPlain(ct, C.three);
+    const d4 = S.evaluator.subPlain(ct, C.four);
+    const m12 = S.evaluator.multiply(d1, d2);
+    S.evaluator.relinearize(m12, S.relinKeys, m12);
+    const m34 = S.evaluator.multiply(d3, d4);
+    S.evaluator.relinearize(m34, S.relinKeys, m34);
+    const p = S.evaluator.multiply(m12, m34);
+    S.evaluator.relinearize(p, S.relinKeys, p);
+    return p;
+  });
+}
+
+/* 서버 측 동형 정확 검사: (ct - Plain(target))^2 */
+function serverExactCheck(ciphertexts, targetDigits) {
+  const targetPlain = S.encoder.encode(digitsToInt32Vec(targetDigits, S.slotCount));
+  return ciphertexts.map(ct => {
+    const diff = S.evaluator.subPlain(ct, targetPlain);
+    const sq   = S.evaluator.square(diff);
+    S.evaluator.relinearize(sq, S.relinKeys, sq);
+    return sq;
+  });
+}
+
+rrnUI.run.addEventListener('click', async () => {
+  rrnUI.run.disabled = true;
+  rrnUI.status.textContent = '진행 중...';
+  rrnUI.log.textContent = '';
+
+  try {
+    const ok = await ensureSealForRRN();
+    if (!ok) { rrnUI.status.textContent = 'SEAL 준비 실패'; return; }
+
+    const mode = document.querySelector('input[name="rrn-mode"]:checked').value;
+    const text = rrnUI.doc.value;
+
+    let targetDigits = null;
+    if (mode === 'exact') {
+      const tRaw = rrnUI.target.value.replace(/-/g, '').trim();
+      if (!/^\d{13}$/.test(tRaw)) { alert('Target RRN 은 13자리 숫자여야 합니다 (하이픈 허용).'); return; }
+      if (!/^\d{6}[1-4]\d{6}$/.test(tRaw)) {
+        if (!confirm('Target RRN 형식(\\d{6}[1-4]\\d{6})이 표준에 맞지 않습니다. 그래도 진행할까요?')) return;
+      }
+      targetDigits = tRaw.split('').map(Number);
+    }
+
+    document.getElementById('rrn-col').textContent = (mode === 'exact') ? '슬롯합' : '슬롯[6]';
+
+    /* ---------------- CLIENT: 후보 추출 + 암호화 ---------------- */
+    rLog(`===== CLIENT (has secret key) — mode: ${mode.toUpperCase()} =====`);
+    const cands = extractRRNCandidates(text, mode);
+    rLog(`후보 추출: ${cands.length} 개  (regex: ${mode === 'exact' ? '\\d{6}-?[1-4]\\d{6}' : '\\d{6}-?\\d{7}'})`);
+    cands.forEach((c, i) => rLog(`  [${i}] @${c.start}-${c.end}  "${c.raw}"  (성별자리=${c.digits[6]})`));
+
+    if (cands.length === 0) {
+      rrnUI.table.innerHTML = '<tr><td colspan="5" class="empty">후보 없음</td></tr>';
+      rrnUI.status.innerHTML = '<span class="pill warn">후보 없음</span>';
+      return;
+    }
+
+    const t0 = performance.now();
+    const ciphertexts = cands.map(c => {
+      const plain = S.encoder.encode(digitsToInt32Vec(c.digits, S.slotCount));
+      return S.encryptor.encrypt(plain);
+    });
+    rLog(`BFV 암호화 완료 (${(performance.now() - t0).toFixed(1)} ms)`);
+
+    /* ---------------- SERVER: 비밀키 없이 동형 검사 ---------------- */
+    rLog('===== SERVER (no secret key, public params only) =====');
+    const t1 = performance.now();
+    const resultCts = (mode === 'exact')
+      ? serverExactCheck(ciphertexts, targetDigits)
+      : serverPatternCheck(ciphertexts);
+    const dt1 = (performance.now() - t1).toFixed(1);
+    rLog(mode === 'exact'
+      ? `for each ct → diff=ct-Plain(target); sq=diff*diff; relinearize  (${dt1} ms)`
+      : `for each ct → p = ((ct-1)(ct-2)) * ((ct-3)(ct-4)); 깊이 2  (${dt1} ms)`);
+    rLog('서버는 결과 값을 알 수 없음 — 암호문만 반환');
+
+    // 진단: 결과 ct 의 noise budget 확인 (10 bits 미만이면 복호화 결과 신뢰 불가)
+    try {
+      const budget = S.decryptor.invariantNoiseBudget(resultCts[0]);
+      rLog(`(diagnostic) noise budget = ${budget} bits${budget < 10 ? '  ⚠ 너무 낮음 — poly_modulus_degree 더 올리세요' : ''}`);
+    } catch (_) { /* API 미지원이면 무시 */ }
+
+    /* ---------------- CLIENT: 복호화 + 판정 ---------------- */
+    rLog('===== CLIENT (has secret key) =====');
+    const t2 = performance.now();
+    const matches = resultCts.map((ct, i) => {
+      const plain = S.decryptor.decrypt(ct);
+      const arr = S.encoder.decode(plain);
+      if (mode === 'exact') {
+        const slots = Array.from(arr.slice(0, 13));
+        const sum = slots.reduce((a, b) => a + Math.abs(b), 0);
+        return { ...cands[i], metric: sum, ok: sum === 0 };
+      } else {
+        const slot6 = Number(arr[6]);   // p(g) at gender position
+        return { ...cands[i], metric: slot6, ok: slot6 === 0 };
+      }
+    });
+    rLog(`복호화 완료 (${(performance.now() - t2).toFixed(1)} ms)`);
+
+    const hits = matches.filter(m => m.ok);
+    rLog(`결과: ${matches.length}개 후보 중 ${hits.length}개 ${mode === 'exact' ? '일치' : '유효한 RRN 형식'}`);
+    matches.forEach((m, i) => rLog(
+      `  [${i}] ${m.raw} · ${mode === 'exact' ? 'slot_sum' : 'slot[6]'}=${m.metric} · ${m.ok ? (mode === 'exact' ? 'MATCH' : 'VALID') : (mode === 'exact' ? 'no' : 'INVALID')}`
+    ));
+
+    rrnUI.table.innerHTML = matches.map((m, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td class="num">${m.start}-${m.end}</td>
+        <td><code class="mono">${escapeHtml(m.raw)}</code></td>
+        <td class="num">${m.metric}</td>
+        <td>${m.ok
+          ? `<span class="pill ok">✓ ${mode === 'exact' ? 'MATCH' : 'VALID RRN'}</span>`
+          : `<span class="pill">${mode === 'exact' ? 'no' : 'invalid'}</span>`}</td>
+      </tr>
+    `).join('');
+
+    rrnUI.status.innerHTML = hits.length
+      ? `<span class="pill ok">${hits.length}개 ${mode === 'exact' ? '일치' : '유효'}</span>`
+      : `<span class="pill warn">${mode === 'exact' ? '일치 없음' : '유효 RRN 없음'}</span>`;
+
+    // 묶음 다운로드용 JSON 준비 (모든 후보 ct + 서버 결과 ct + 메타)
+    _rrnBundle = {
+      generated_at: new Date().toISOString(),
+      scheme: S.schemeName, poly_modulus_degree: S.polyDeg, slot_count: S.slotCount,
+      mode,
+      target_digits: targetDigits,
+      encryption_parameters_b64: S.parms.save(),
+      public_key_b64: S.publicKey.save(),
+      relin_keys_b64: S.relinKeys.save(),
+      candidates: matches.map((m, i) => ({
+        index: i,
+        position: { start: m.start, end: m.end },
+        raw_in_plaintext: m.raw,
+        digits: m.digits,
+        candidate_ciphertext_b64: ciphertexts[i].save(),
+        server_result_ciphertext_b64: resultCts[i].save(),
+        decrypted_metric: m.metric,
+        matched: m.ok,
+      })),
+    };
+    rrnUI.bundleDl.disabled = false;
+    rrnUI.bundleInfo.innerHTML =
+      `<span class="pill">${matches.length}개 후보 + 결과 ct 묶음 준비됨</span>`;
+  } catch (e) {
+    rLog('ERROR: ' + e.message);
+    alert('실행 실패: ' + e.message);
+  } finally {
+    rrnUI.run.disabled = false;
+  }
+});
+
+/* Mode 변경 시 Target 입력 활성/비활성 */
+document.querySelectorAll('input[name="rrn-mode"]').forEach(r => {
+  r.addEventListener('change', () => {
+    const exact = document.querySelector('input[name="rrn-mode"]:checked').value === 'exact';
+    rrnUI.target.disabled = !exact;
+    rrnUI.target.style.opacity = exact ? 1 : 0.4;
+  });
+});
+</script>
+</body>
+</html>
