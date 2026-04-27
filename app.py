@@ -158,6 +158,11 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/docs")
+def docs():
+    return render_template("docs.html")
+
+
 @app.route("/api/recognizers", methods=["GET"])
 def list_recognizers():
     """현재 활성화된 인식기 목록과 지원 엔티티를 반환."""

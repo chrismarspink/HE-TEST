@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>Docs · HE-TEST</title>
+<style>
+  :root {
+    --bg: #0f1115; --card: #181b22; --line: #2a2f3a;
+    --text: #e6e8ee; --muted: #9aa3b2; --accent: #4f8cff;
+    --hi: #ffd166; --danger: #ef476f; --ok: #06d6a0;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: -apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.65;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .top {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 18px;
+  }
+  h1 { margin: 0; font-size: 22px; }
+  h2 {
+    margin: 28px 0 8px; font-size: 17px;
+    border-left: 3px solid var(--accent); padding-left: 10px;
+  }
+  h3 { margin: 18px 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  p, li { font-size: 14px; }
+  ul, ol { padding-left: 22px; }
+  li { margin: 4px 0; }
+  code { background: #0b0d12; padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+  pre {
+    background: #0b0d12; border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px; font-family: ui-monospace,"Consolas",monospace; font-size: 12.5px;
+    line-height: 1.55; overflow-x: auto;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 600;
+  }
+  .pill.ok   { background: rgba(6,214,160,.15);  color: var(--ok); }
+  .pill.warn { background: rgba(255,209,102,.15); color: var(--hi); }
+  .pill.bad  { background: rgba(239,71,111,.15); color: var(--danger); }
+  .toc {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 20px; margin-bottom: 18px;
+  }
+  .toc ol { margin: 6px 0; }
+  .note {
+    border-left: 3px solid var(--hi); background: rgba(255,209,102,.06);
+    padding: 8px 12px; border-radius: 4px; margin: 10px 0; font-size: 13px;
+  }
+  .danger {
+    border-left: 3px solid var(--danger); background: rgba(239,71,111,.06);
+    padding: 8px 12px; border-radius: 4px; margin: 10px 0; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <h1>📖 HE-TEST 문서</h1>
+  <a href="/">← 데모로 돌아가기</a>
+</div>
+
+<div class="toc">
+  <h3 style="margin-top:0;">목차</h3>
+  <ol>
+    <li><a href="#what">동형암호란 무엇인가</a></li>
+    <li><a href="#schemes">SEAL 의 두 스킴: BFV vs CKKS</a></li>
+    <li><a href="#keys">키 4종 — 역할과 보호 레벨</a></li>
+    <li><a href="#flow">키 생성·배포 흐름</a></li>
+    <li><a href="#ops">동형연산 종류와 곱셈 깊이</a></li>
+    <li><a href="#noise">노이즈 예산 (Noise Budget)</a></li>
+    <li><a href="#pattern">패턴 매칭 트릭 — 다항식 zero-test</a></li>
+    <li><a href="#privacy">본 데모의 프라이버시 모델</a></li>
+    <li><a href="#caveats">실제 운영 시 고려사항</a></li>
+    <li><a href="#refs">참고 자료</a></li>
+  </ol>
+</div>
+
+<h2 id="what">1. 동형암호란 무엇인가</h2>
+<p>
+  <b>Homomorphic Encryption (HE)</b> 은 <b>암호문 상태에서 연산</b>이 가능한 암호 방식입니다.
+  일반 암호는 <code>Dec(Enc(a) + Enc(b))</code> 와 같은 합산을 시도하면 의미 없는 비트가 나오지만,
+  HE 에서는 정의된 연산 집합(+, ×, …) 안에서 <code>Dec(Enc(a) ⊕ Enc(b)) = a + b</code> 가 성립합니다.
+</p>
+<table>
+  <thead><tr><th>분류</th><th>지원 연산</th><th>대표</th></tr></thead>
+  <tbody>
+    <tr><td>PHE (Partially HE)</td><td>한 종류만 (예: + 만, 또는 × 만)</td><td>Paillier(+), RSA(×)</td></tr>
+    <tr><td>SHE / Leveled HE</td><td>+ 와 × 모두, <b>유한한 깊이</b>까지</td><td><b>SEAL BFV/CKKS</b></td></tr>
+    <tr><td>FHE</td><td>무제한 깊이 (bootstrapping 으로 노이즈 재정리)</td><td>SEAL(미사용), HElib, OpenFHE</td></tr>
+  </tbody>
+</table>
+<p>본 데모는 <b>SEAL 의 leveled HE</b>를 그대로 사용합니다 — bootstrapping 없이 미리 정한 깊이까지만 안전.</p>
+
+<h2 id="schemes">2. SEAL 의 두 스킴: BFV vs CKKS</h2>
+<table>
+  <thead><tr><th></th><th>BFV</th><th>CKKS</th></tr></thead>
+  <tbody>
+    <tr><td>데이터 타입</td><td>정수 벡터</td><td>실수/복소수 벡터</td></tr>
+    <tr><td>정확성</td><td>정확 (exact)</td><td>근사 (approximate)</td></tr>
+    <tr><td>대표 사용처</td><td>비교·검색·카운트·체크섬</td><td>ML 추론·통계·평균</td></tr>
+    <tr><td>특수 연산</td><td>—</td><td><code>rescaleToNext</code> (스케일 정리)</td></tr>
+    <tr><td>plain modulus</td><td>필요 (정수 모듈러)</td><td>없음</td></tr>
+    <tr><td>이 데모에서</td><td>RRN 검색·SEAL 정수 연산</td><td>SEAL 부동소수 연산</td></tr>
+  </tbody>
+</table>
+
+<h2 id="keys">3. 키 4종 — 역할과 보호 레벨</h2>
+<p>본 데모의 SEAL 컨텍스트는 다음 4가지 직렬화 객체를 생성합니다. 각각 누가 가져야 하고 어디까지 노출 가능한지 구분이 필요합니다.</p>
+
+<table>
+  <thead><tr><th style="width:160px;">객체</th><th>보호 레벨</th><th>역할</th><th>노출 시 위험</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Encryption Parameters</td>
+      <td><span class="pill ok">PUBLIC</span></td>
+      <td>스킴/poly_modulus_degree/coefficient·plain modulus 등 컨텍스트 정의값. 다른 PC 가 같은 컨텍스트를 재구성하기 위한 메타 정보.</td>
+      <td>없음 — 평문도 키도 들어있지 않음</td>
+    </tr>
+    <tr>
+      <td>Public Key</td>
+      <td><span class="pill ok">PUBLIC</span></td>
+      <td>평문 → 암호문. 데이터를 보내야 하는 모든 클라이언트에 배포 가능.</td>
+      <td>없음 — 공개키만으로 평문 복원 불가</td>
+    </tr>
+    <tr>
+      <td>Secret Key</td>
+      <td><span class="pill bad">SECRET</span></td>
+      <td>암호문 → 평문. 같은 컨텍스트로 만들어진 <b>모든 암호문</b>을 복호화할 수 있는 유일한 키.</td>
+      <td>치명적 — 노출 시 해당 컨텍스트의 모든 데이터 평문 노출</td>
+    </tr>
+    <tr>
+      <td>Relin Keys</td>
+      <td><span class="pill warn">EVALUATION</span></td>
+      <td>곱셈 직후 길이가 늘어난 암호문(degree-3 polynomial)을 표준 길이(degree-2)로 줄이는 key-switching 키. 동형연산을 수행하는 서버가 보유.</td>
+      <td>이론상 매우 제한적인 부분 노출 가능 — 평문 복원에는 사용 불가하지만 무관계자에게는 비공개 유지가 권장됨</td>
+    </tr>
+    <tr>
+      <td>Galois Keys (선택)</td>
+      <td><span class="pill warn">EVALUATION</span></td>
+      <td>슬롯 회전(rotate) 에 필요한 key-switching 키. SIMD 슬롯 합산·내적 등을 가능하게 함. 본 데모는 미사용.</td>
+      <td>Relin Keys 와 동일한 카테고리 — 평문 복원 불가지만 비공개 권장</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="danger">
+<b>실서비스 원칙</b> — Secret Key 는 절대 평문으로 외부 전송·디스크 저장하지 마세요. HSM, 키매니저(KMS), TPM 또는 클라이언트 디바이스 시큐어 엔클레이브에 보관하고 휘발성 메모리에서만 사용해야 합니다.
+</div>
+
+<h3>보호 레벨 요약</h3>
+<ul>
+  <li><span class="pill ok">PUBLIC</span> — 누구에게 줘도 무방. 평문/비밀키 정보 없음.</li>
+  <li><span class="pill warn">EVALUATION</span> — 동형연산을 수행할 평가자(서버) 에게 전달. 익명/외부 노출은 권장 X.</li>
+  <li><span class="pill bad">SECRET</span> — 데이터 소유자만. 절대 외부 전송·평문 저장 금지.</li>
+</ul>
+
+<h2 id="flow">4. 키 생성·배포 흐름</h2>
+<pre>
+┌── EncryptionParameters ─────────┐
+│  scheme, poly_modulus_degree,    │
+│  coeff_modulus, plain_modulus    │
+└────────────────┬─────────────────┘
+                 ↓
+        ┌────────────────┐
+        │     Context    │  파라미터 검증 (parametersSet())
+        └────────┬───────┘
+                 ↓
+        ┌────────────────┐
+        │  KeyGenerator  │
+        └────────┬───────┘
+                 │
+   ┌─────────────┼──────────────┬──────────────┐
+   ↓             ↓              ↓              ↓
+publicKey   secretKey      relinKeys    galoisKeys (선택)
+ [PUBLIC]    [SECRET]      [EVAL]       [EVAL]
+   ↓             ↓              ↓
+ 암호화     복호화         서버 동형연산 후
+                          ct 크기 정상화
+</pre>
+
+<h3>역할별 누가 무엇을 가지나</h3>
+<table>
+  <thead><tr><th></th><th>EncParms</th><th>publicKey</th><th>secretKey</th><th>relinKeys</th></tr></thead>
+  <tbody>
+    <tr><td>데이터 소유자(클라이언트)</td><td>✓</td><td>✓</td><td><b>✓</b></td><td>✓ (생성·배포)</td></tr>
+    <tr><td>평가자(서버)</td><td>✓</td><td>✓</td><td>✗</td><td>✓ (수신해서 사용)</td></tr>
+    <tr><td>제3자(평문 데이터 송신)</td><td>✓</td><td>✓</td><td>✗</td><td>✗</td></tr>
+  </tbody>
+</table>
+
+<h2 id="ops">5. 동형연산 종류와 곱셈 깊이</h2>
+<table>
+  <thead><tr><th>연산</th><th>API (node-seal)</th><th>깊이 증가</th><th>비고</th></tr></thead>
+  <tbody>
+    <tr><td>덧셈 (ct + ct)</td><td><code>evaluator.add</code></td><td>0</td><td>노이즈 거의 변화 없음</td></tr>
+    <tr><td>덧셈 (ct + plain)</td><td><code>addPlain</code></td><td>0</td><td>—</td></tr>
+    <tr><td>뺄셈</td><td><code>sub</code>, <code>subPlain</code></td><td>0</td><td>—</td></tr>
+    <tr><td>곱셈 (ct × ct)</td><td><code>multiply</code></td><td><b>+1</b></td><td>ct 크기 ↑ → <b>relinearize 필요</b></td></tr>
+    <tr><td>곱셈 (ct × plain)</td><td><code>multiplyPlain</code></td><td>+1</td><td>relinearize 불필요</td></tr>
+    <tr><td>제곱</td><td><code>square</code></td><td>+1</td><td>multiply 의 특수 케이스</td></tr>
+    <tr><td>부호 반전</td><td><code>negate</code></td><td>0</td><td>—</td></tr>
+    <tr><td>회전(SIMD)</td><td><code>rotateRows</code></td><td>0</td><td>galoisKeys 필요</td></tr>
+    <tr><td>스케일 정리(CKKS 전용)</td><td><code>rescaleToNext</code></td><td>레벨 1↓</td><td>곱셈 후 호출</td></tr>
+  </tbody>
+</table>
+
+<h2 id="noise">6. 노이즈 예산 (Noise Budget)</h2>
+<p>
+  BFV 의 모든 암호문은 약간의 노이즈를 동반합니다. 곱셈을 거듭할수록 노이즈가 증폭되고,
+  <b>budget &le; 0</b> 이 되면 복호화 결과가 임의의 정수가 됩니다 (= 데이터가 망가짐, 아님).
+</p>
+
+<h3>대략의 budget 변화</h3>
+<table>
+  <thead><tr><th>poly_modulus_degree</th><th>coeff modulus 합</th><th>fresh ct budget</th><th>곱셈 1회 후</th><th>곱셈 2회 후</th></tr></thead>
+  <tbody>
+    <tr><td>2048</td><td>~54 bit</td><td>~12 bit</td><td>음수 → 실패</td><td>—</td></tr>
+    <tr><td>4096</td><td>~109 bit</td><td>~50 bit</td><td>~20 bit</td><td>음수 → 실패</td></tr>
+    <tr><td><b>8192</b></td><td>~218 bit</td><td>~150 bit</td><td>~110 bit</td><td>~70-90 bit ✓</td></tr>
+    <tr><td>16384</td><td>~438 bit</td><td>~370 bit</td><td>~330 bit</td><td>~290 bit</td></tr>
+  </tbody>
+</table>
+<p style="font-size:12.5px; color:var(--muted);">실제 budget 은 plain_modulus 비트 크기와 연산 종류에 따라 변동 — 위는 본 데모의 plain_modulus ≈ 2<sup>20</sup> 가정 시 대략값.</p>
+
+<div class="note">
+<b>본 데모 RRN Pattern 모드</b> 가 자동으로 poly_modulus_degree=8192 를 강제하는 이유: 다항식 <code>(d-1)(d-2)(d-3)(d-4)</code> 평가가 깊이 2 곱셈이라 4096 의 budget 으로는 부족.
+</div>
+
+<h2 id="pattern">7. 패턴 매칭 트릭 — 다항식 zero-test</h2>
+<p>HE 는 비교(<code>==</code>, <code>&lt;</code>) 를 직접 지원하지 않지만, 등치 검사는 <b>차의 제곱</b> 또는 <b>다항식 zero-test</b> 로 환원할 수 있습니다.</p>
+
+<h3>유한 집합 멤버십: <code>x ∈ {a₁, …, aₙ}</code></h3>
+<pre>
+p(x) = (x − a₁)(x − a₂) … (x − aₙ)
+   = 0   ⇔   x ∈ {a₁, a₂, …, aₙ}
+</pre>
+<p>위 식은 다항식 곱셈만으로 평가 가능 → HE 친화적. RRN 의 성별자리(7번째 숫자) 가 <code>{1,2,3,4}</code> 중 하나인지 확인하는 데 정확히 이 트릭을 씁니다.</p>
+
+<pre>
+// 각 후보 ct 에 대해 (depth 2)
+d1 = ct − Plain([1,1,...])
+d2 = ct − Plain([2,2,...])
+d3 = ct − Plain([3,3,...])
+d4 = ct − Plain([4,4,...])
+m12 = d1 × d2;  relinearize(m12)
+m34 = d3 × d4;  relinearize(m34)
+p   = m12 × m34;  relinearize(p)
+// → 슬롯 6 의 평문 값이 0 ⇔ 성별자리 ∈ {1,2,3,4}
+</pre>
+
+<h3>완전 일치 검사: <code>x == t</code></h3>
+<pre>
+diff = ct − Plain(t)
+sq   = diff × diff   // 0 만 0, 다른 값은 양수
+// → 모든 슬롯이 0 ⇔ 완전 일치
+</pre>
+
+<h2 id="privacy">8. 본 데모의 프라이버시 모델</h2>
+<pre>
+┌─────────── CLIENT (data owner) ───────────┐
+│ 보유: EncParms, publicKey, secretKey,       │
+│       relinKeys, 평문 데이터                 │
+│                                            │
+│ 1. 데이터 → publicKey 로 암호화              │
+│ 2. 결과 ct 를 비밀키로 복호화                  │
+└────────────┬────────────────┬──────────────┘
+             │ ct 만 전송       │ result ct 만 수신
+             ↓                ↑
+┌───────────────────────────────────────────┐
+│ SERVER (evaluator)                         │
+│ 보유: EncParms, publicKey, relinKeys        │
+│       (secretKey 없음 → 평문 복원 절대 불가) │
+│                                            │
+│ ct 에 대해 add/multiply/square 등           │
+│ 동형연산만 수행                              │
+└───────────────────────────────────────────┘
+</pre>
+<ul>
+  <li>서버는 <b>평문을 단 한 순간도</b> 보지 않음</li>
+  <li>서버는 비밀키가 없으므로 ct 의 의미를 알 수 없음 (의미적 보안)</li>
+  <li>탭 2(SEAL)·탭 3(RRN Search) 모두 같은 모델 — 다만 본 브라우저 데모에서는 클라이언트와 서버 역할이 같은 페이지에서 시뮬레이션되어 있을 뿐</li>
+</ul>
+
+<h2 id="caveats">9. 실제 운영 시 고려사항</h2>
+<ul>
+  <li><b>비밀키 분리</b> — 데모는 편의상 brower 메모리에 두고 화면에도 보여주지만, 실제 시스템은 KMS/HSM/TPM 또는 보안 엔클레이브에서만 사용해야 함</li>
+  <li><b>매개변수 선택</b> — security level (HE Standard 권장 128bit), poly_modulus_degree, plain_modulus 는 위협 모델·연산 깊이·성능 요구 균형으로 결정</li>
+  <li><b>키 크기와 대역폭</b> — galois keys 는 수십 MB 까지 커질 수 있음. 압축·필요 회전만 생성 등 최적화 필요</li>
+  <li><b>부채널·악의적 클라이언트</b> — HE 자체는 IND-CPA. 능동적 공격(예: 변조된 ct 주입)은 별도 무결성/인증 메커니즘 필요</li>
+  <li><b>Bootstrapping 미사용</b> — leveled scheme 의 깊이 한계. 깊은 회로(예: 신경망 추론) 가 필요하면 bootstrapping 가능 라이브러리(OpenFHE 등) 또는 회로 분할 전략을 검토</li>
+  <li><b>RRN 검색의 부정확성</b> — 정규식 추출에 의존하므로 띄어쓰기·특수문자가 끼어든 변형은 보강 필요. 진짜 양방향 PSI 가 필요하면 OPRF + HE 조합 또는 PIR 사용</li>
+</ul>
+
+<h2 id="refs">10. 참고 자료</h2>
+<ul>
+  <li><a href="https://github.com/microsoft/SEAL" target="_blank">Microsoft SEAL</a> — C++ 본체 라이브러리</li>
+  <li><a href="https://github.com/morfix-io/node-seal" target="_blank">node-seal</a> — JS/WASM 래퍼 (본 데모가 사용)</li>
+  <li><a href="https://eprint.iacr.org/2012/144" target="_blank">BFV 논문</a> · <a href="https://eprint.iacr.org/2016/421" target="_blank">CKKS 논문</a></li>
+  <li><a href="https://homomorphicencryption.org/standard/" target="_blank">HE Standard</a> — 권장 매개변수</li>
+  <li><a href="/">← 데모로 돌아가기</a></li>
+</ul>
+
+</div>
+</body>
+</html>

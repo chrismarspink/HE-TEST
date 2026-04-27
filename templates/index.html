@@ -95,7 +95,10 @@
   .ser-label { font-weight: 600; min-width: 130px; }
   .ser-size { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
   .ser-body { margin: 6px 0 0; padding: 8px; background: #07080c; font-family: ui-monospace,"Consolas",monospace; font-size: 11px; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow: auto; border-radius: 4px;}
+  .ser-desc { font-size: 11.5px; color: var(--muted); margin: 4px 0 0; line-height: 1.55; }
   button.mini { padding: 3px 9px; font-size: 11px; }
+  .doc-link { color: var(--accent); text-decoration: none; font-size: 13px; }
+  .doc-link:hover { text-decoration: underline; }
   .loader { display:none; color: var(--muted); font-size:13px; margin-top:8px;}
   .loader.show { display: inline; }
   details { margin-top: 8px; }
@@ -111,7 +114,10 @@
 <body>
 
 <h1>PII Scanner & Microsoft SEAL Demo</h1>
-<p class="lead">Presidio 로 민감정보를 감지하고, Microsoft SEAL 동형암호로 데이터를 보호한 채 연산해봅니다.</p>
+<p class="lead">
+  Presidio 로 민감정보를 감지하고, Microsoft SEAL 동형암호로 데이터를 보호한 채 연산해봅니다.
+  <a href="/docs" target="_blank" class="doc-link">📖 문서 — 키 역할·노이즈·패턴매칭 트릭</a>
+</p>
 
 <div class="tabs">
   <button class="tab-btn active" data-tab="scanner">PII Scanner</button>
@@ -392,6 +398,22 @@
 │   ⇒ 유효한 RRN 형식           │
 └──────────────────────────────┘
 </pre>
+    </div>
+
+    <div class="card">
+      <h2>키 (Keys)</h2>
+      <p style="color:var(--muted); font-size:12px; margin:4px 0 8px;">
+        SEAL 탭과 동일한 컨텍스트의 키. 비밀키는 실서비스에서 <b>외부 유출 금지</b>.
+      </p>
+      <div id="rrn-keys"><span class="empty">초기화 후 표시됩니다.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>암호문 (Ciphertexts)</h2>
+      <p style="color:var(--muted); font-size:12px; margin:4px 0 8px;">
+        후보별로 <b>입력 암호문 (클라이언트가 전송)</b> 과 <b>서버 결과 암호문 (동형연산 후)</b> 두 개가 짝지어 표시됩니다.
+      </p>
+      <div id="rrn-ciphers"><span class="empty">실행 후 표시됩니다.</span></div>
     </div>
 
     <div class="card">
@@ -701,18 +723,28 @@ function downloadText(filename, content) {
   setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
-function renderSerRow(label, savable, filename, warn) {
+/* opts = { description, protection: 'public' | 'eval' | 'secret' } */
+function renderSerRow(label, savable, filename, opts) {
+  opts = opts || {};
+  const proto = opts.protection || null;
+  const desc = opts.description || '';
+
+  const protoPill = proto === 'secret' ? '<span class="pill bad">SECRET</span>'
+                  : proto === 'eval'   ? '<span class="pill warn">EVALUATION</span>'
+                  : proto === 'public' ? '<span class="pill ok">PUBLIC</span>'
+                  : '';
+
   if (!savable) {
     return `<div class="ser-row"><div class="ser-head">
-      <span class="ser-label">${escapeHtml(label)}</span>
+      <span class="ser-label">${escapeHtml(label)}</span>${protoPill}
       <span class="empty">아직 생성되지 않음</span>
-    </div></div>`;
+    </div>${desc ? `<div class="ser-desc">${escapeHtml(desc)}</div>` : ''}</div>`;
   }
   let b64;
   try { b64 = savable.save(); }
   catch (e) {
     return `<div class="ser-row"><div class="ser-head">
-      <span class="ser-label">${escapeHtml(label)}</span>
+      <span class="ser-label">${escapeHtml(label)}</span>${protoPill}
       <span class="empty">save() 실패: ${escapeHtml(e.message)}</span>
     </div></div>`;
   }
@@ -726,12 +758,13 @@ function renderSerRow(label, savable, filename, warn) {
     <div class="ser-row">
       <div class="ser-head">
         <span class="ser-label">${escapeHtml(label)}</span>
-        ${warn ? '<span class="pill bad">SECRET</span>' : ''}
+        ${protoPill}
         <span class="ser-size">${b64.length.toLocaleString()} chars (b64)</span>
         <button class="secondary mini" data-act="toggle" data-id="${id}">Show / Hide</button>
         <button class="secondary mini" data-act="copy"   data-id="${id}">Copy</button>
         <button class="secondary mini" data-act="dl"     data-id="${id}">Download</button>
       </div>
+      ${desc ? `<div class="ser-desc">${escapeHtml(desc)}</div>` : ''}
       <pre class="ser-body" id="${id}-body" hidden>${escapeHtml(head)}${escapeHtml(tailNote)}</pre>
     </div>`;
 }
@@ -753,20 +786,73 @@ function attachSerHandlers(rootEl) {
   });
 }
 
+/* 각 키의 역할/보호 레벨 (UI 와 /docs 페이지에서 공통 사용) */
+const KEY_META = {
+  parms: {
+    label: 'Encryption Parameters',
+    protection: 'public',
+    description: '스킴(BFV/CKKS), poly_modulus_degree, coefficient/plain modulus 같은 컨텍스트 정의값. 평문 노출 위험 없음 → 누구나 보유 가능. 다른 PC 에서 같은 컨텍스트를 재구성할 때 반드시 필요.',
+  },
+  publicKey: {
+    label: 'Public Key',
+    protection: 'public',
+    description: '평문 → 암호문 변환에 사용. 누구나 가져도 평문을 복원할 수 없음. 데이터를 보내는 모든 클라이언트에 배포해야 함.',
+  },
+  secretKey: {
+    label: 'Secret Key',
+    protection: 'secret',
+    description: '암호문 → 평문을 복원하는 유일한 키. 노출되면 같은 공개키로 만든 모든 암호문이 복호화됨. 데이터 소유자만 보유, 절대 외부 전송/평문 저장 금지 (HSM·TPM·키매니저 사용 권장).',
+  },
+  relinKeys: {
+    label: 'Relin Keys',
+    protection: 'eval',
+    description: '곱셈 후 커진 암호문 크기를 표준으로 되돌리는 key-switching 키. 비밀키 정보의 일부가 형식 변환용으로 들어 있어 의미상 evaluation 키 — 평문 복원에는 쓸 수 없으나 무관계자에게는 비공개를 유지하는 것이 좋음. 동형 곱셈을 수행하는 서버(평가자) 가 보유.',
+  },
+};
+
 function refreshKeysPanel() {
-  const target = document.getElementById('seal-keys');
+  ['seal-keys', 'rrn-keys'].forEach(id => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    if (!sealReady) {
+      target.innerHTML = '<span class="empty">초기화 후 표시됩니다.</span>';
+      return;
+    }
+    const r = (metaKey, savable, file) =>
+      renderSerRow(KEY_META[metaKey].label, savable, file, {
+        protection: KEY_META[metaKey].protection,
+        description: KEY_META[metaKey].description,
+      });
+    target.innerHTML = [
+      r('parms',     S.parms,     'encryption_parameters.b64.txt'),
+      r('publicKey', S.publicKey, 'public_key.b64.txt'),
+      r('secretKey', S.secretKey, 'secret_key.b64.txt'),
+      r('relinKeys', S.relinKeys, 'relin_keys.b64.txt'),
+    ].join('');
+  });
+}
+
+/* RRN 후보별: 입력 ct + 서버 결과 ct 한 묶음씩 */
+function refreshRrnCiphersPanel(cands, ciphertexts, resultCts) {
+  const target = document.getElementById('rrn-ciphers');
   if (!target) return;
-  if (!sealReady) {
-    target.innerHTML = '<span class="empty">초기화 후 표시됩니다.</span>';
+  if (!cands || !cands.length) {
+    target.innerHTML = '<span class="empty">실행 후 표시됩니다.</span>';
     return;
   }
-  target.innerHTML = [
-    renderSerRow('Encryption Parameters', S.parms,     'encryption_parameters.b64.txt', false),
-    renderSerRow('Public Key',            S.publicKey, 'public_key.b64.txt',           false),
-    renderSerRow('Secret Key',            S.secretKey, 'secret_key.b64.txt',           true ),
-    renderSerRow('Relin Keys',            S.relinKeys, 'relin_keys.b64.txt',           false),
-  ].join('');
+  target.innerHTML = cands.map((c, i) => `
+    <div style="margin-bottom:10px; padding-bottom:6px; border-bottom:1px dashed var(--line);">
+      <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">
+        Candidate #${i + 1} · "<code class="mono">${escapeHtml(c.raw)}</code>" · pos ${c.start}-${c.end}
+      </div>
+      ${renderSerRow(`Input ct #${i+1}`,      ciphertexts[i], `rrn_input_${i+1}.b64.txt`,  { protection:'public', description: CT_DESC_INPUT  })}
+      ${renderSerRow(`Server result #${i+1}`, resultCts[i],   `rrn_result_${i+1}.b64.txt`, { protection:'public', description: CT_DESC_RESULT })}
+    </div>
+  `).join('');
 }
+
+const CT_DESC_INPUT  = '평문 벡터를 공개키로 암호화한 결과. 비밀키 없이 평문 복원 불가 → 서버에 전송해도 안전(PUBLIC).';
+const CT_DESC_RESULT = '서버가 동형연산을 적용한 결과 암호문. 마찬가지로 비밀키 없이 평문 복원 불가.';
 
 function refreshCiphersPanel() {
   const target = document.getElementById('seal-ciphers');
@@ -777,15 +863,15 @@ function refreshCiphersPanel() {
     return;
   }
   target.innerHTML = [
-    S.ctA ? renderSerRow('Ciphertext A',      S.ctA, 'ciphertext_A.b64.txt',      false) : '',
-    S.ctB ? renderSerRow('Ciphertext B',      S.ctB, 'ciphertext_B.b64.txt',      false) : '',
-    S.ctR ? renderSerRow('Ciphertext Result', S.ctR, 'ciphertext_result.b64.txt', false) : '',
+    S.ctA ? renderSerRow('Ciphertext A',      S.ctA, 'ciphertext_A.b64.txt',      { protection:'public', description: CT_DESC_INPUT  }) : '',
+    S.ctB ? renderSerRow('Ciphertext B',      S.ctB, 'ciphertext_B.b64.txt',      { protection:'public', description: CT_DESC_INPUT  }) : '',
+    S.ctR ? renderSerRow('Ciphertext Result', S.ctR, 'ciphertext_result.b64.txt', { protection:'public', description: CT_DESC_RESULT }) : '',
   ].filter(Boolean).join('');
 }
 
-// 위 두 패널 컨테이너에 한 번만 클릭 위임 핸들러를 부착
+// 패널 컨테이너에 한 번만 클릭 위임 핸들러를 부착
 (function bindPanels() {
-  ['seal-keys', 'seal-ciphers'].forEach(id => {
+  ['seal-keys', 'seal-ciphers', 'rrn-keys', 'rrn-ciphers'].forEach(id => {
     const el = document.getElementById(id);
     if (el) attachSerHandlers(el);
   });
@@ -1018,6 +1104,9 @@ rrnUI.run.addEventListener('click', async () => {
   rrnUI.run.disabled = true;
   rrnUI.status.textContent = '진행 중...';
   rrnUI.log.textContent = '';
+  // 이전 실행의 후보별 암호문 패널 비우기
+  const cipherPanel = document.getElementById('rrn-ciphers');
+  if (cipherPanel) cipherPanel.innerHTML = '<span class="empty">실행 후 표시됩니다.</span>';
 
   try {
     const ok = await ensureSealForRRN();
@@ -1137,6 +1226,9 @@ rrnUI.run.addEventListener('click', async () => {
     rrnUI.bundleDl.disabled = false;
     rrnUI.bundleInfo.innerHTML =
       `<span class="pill">${matches.length}개 후보 + 결과 ct 묶음 준비됨</span>`;
+
+    // 후보별 입력 ct + 서버 결과 ct 패널 갱신
+    refreshRrnCiphersPanel(matches, ciphertexts, resultCts);
   } catch (e) {
     rLog('ERROR: ' + e.message);
     alert('실행 실패: ' + e.message);

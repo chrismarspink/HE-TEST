@@ -10,6 +10,8 @@
 | **SEAL Demo**   | BFV/CKKS 스킴으로 벡터 암호화 → 암호문 상태로 +, −, ×, square, negate → 복호화 | node-seal (브라우저 WASM) |
 | **RRN Search (HE)** | 문서 안의 주민등록번호를 **복호화 없이** 동형연산으로 검색 (Exact / Pattern) | node-seal |
 
+📖 **`/docs`** 페이지 — 서버 실행 후 [http://127.0.0.1:5000/docs](http://127.0.0.1:5000/docs) — 동형암호 개념, 키 4종의 역할/보호 레벨, 노이즈 예산, 패턴 매칭 트릭을 정리한 설명 페이지.
+
 추가 기능:
 
 - **사용자 정의 룰** (`custom_patterns.yaml`) — 정규식·키워드 인식기 자유롭게 추가
