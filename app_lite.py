@@ -347,6 +347,10 @@ def extract_text(filename: str, raw: bytes) -> str:
                     parts.append(cell.text)
         return "\n".join(parts)
 
+    if ext == ".hwp":
+        from hwp_extract import extract_hwp_text
+        return extract_hwp_text(raw)
+
     return _smart_decode(raw)
 
 

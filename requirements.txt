@@ -6,3 +6,6 @@ pypdf==4.3.1
 python-docx==1.1.2
 spacy==3.7.5
 numpy<2.0
+# HWP (Hancom) 파일 지원
+pyhwp>=0.1b15
+olefile>=0.46

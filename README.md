@@ -16,6 +16,8 @@
 추가 기능:
 
 - **사용자 정의 룰** (`custom_patterns.yaml`) — 정규식·키워드 인식기 자유롭게 추가
+- **언어 선택** — PII Scanner 에서 자동(한+영) / 한국어 / English 토글
+- **지원 포맷** — `.txt .log .csv .json .md .yaml .xml .html .pdf .docx .hwp` (HWP 는 [pyhwp](https://pypi.org/project/pyhwp/) 의 `hwp5txt` CLI 를 우선 사용, 미설치 시 `olefile` 기반 자체 파서로 폴백)
 - **키 / 암호문 직렬화** — Public/Secret/Relin Key 와 Encryption Parameters, Ciphertext 를 base64 로 보고/복사/다운로드
 - **RRN 검색 묶음 다운로드** — 모든 후보 ct + 서버 결과 ct + 메타를 JSON 한 파일로 저장
 
