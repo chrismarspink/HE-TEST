@@ -1,4 +1,4 @@
-테스트용 샘플 문서입니다.
+테스트용 샘플 문서입니다 (한글 + 영문 혼합).
 
 [고객 정보]
 이름: 홍길동
@@ -7,17 +7,23 @@
 이메일: gildong.hong@example.com
 주소: 서울특별시 강남구 테헤란로 123
 
+[추가 고객]
+김철수: 010-9876-5432, 850506-2345678
+이영희 (대전광역시 유성구 대학로 99)
+
 [회사 정보]
 회사명: ProjectOmega 연구소
 사업자등록번호: 123-45-67890
-담당자: 김철수 (010-9876-5432)
+본사: 경기도 성남시 분당구 판교로 235
 
 [계정/시크릿 (절대 외부 유출 금지)]
 AWS Access Key: AKIAIOSFODNN7EXAMPLE
 API_KEY = demo_FAKE_4eC39HqLyjWDarjtT1zdp7dcabcdef1234567890
 DB password = correcthorsebatterystaple
 
-[해외 정보]
+[해외 정보 / Mixed]
 US SSN: 123-45-6789
 Credit Card: 4111-1111-1111-1111
 Email: john.doe@acme.com
+Phone (US): +1 (415) 555-0123
+Server URL: https://srv-01.internal.acme.com/health

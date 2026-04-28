@@ -78,7 +78,11 @@ python -c "import sys; print(sys.version)"
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 python -m spacy download en_core_web_sm
+python -m spacy download ko_core_news_sm   # ← 한국어 NER 까지 쓰려면
 ```
+
+> 한국어 모델 미설치라도 lite 버전 / app.py 의 정규식 룰은 정상 동작합니다.
+> 한국어 모델 설치 시 PII Scanner 의 "Language" 셀렉터에 자동 활성화됩니다.
 
 ### 2-C. 서버 실행
 

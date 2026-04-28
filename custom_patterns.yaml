@@ -7,13 +7,18 @@
 # 두 가지 종류의 인식기를 추가할 수 있습니다.
 #  1) pattern_recognizers : 정규식 기반
 #  2) deny_list_recognizers : 키워드 목록 기반
+#
+# supported_language 값:
+#   - "any"        : 모든 언어 모드 (auto / ko / en) 에서 동작 (기본 권장)
+#   - "ko" / "en"  : 해당 언어 선택 시에만 동작
+#   - [ko, en]     : 리스트로 다중 언어 지정 가능
 # =============================================================================
 
 pattern_recognizers:
 
   - name: KR_RRN                       # 한국 주민등록번호
     supported_entity: KR_RRN
-    supported_language: en             # spaCy en_core_web_lg 사용 시 en 으로 둠
+    supported_language: any
     patterns:
       - name: rrn_with_hyphen
         regex: '\b\d{6}-[1-4]\d{6}\b'
@@ -28,7 +33,7 @@ pattern_recognizers:
 
   - name: KR_PHONE                     # 한국 휴대폰 번호
     supported_entity: KR_PHONE
-    supported_language: en
+    supported_language: any
     patterns:
       - name: mobile_with_hyphen
         regex: '\b01[016-9]-\d{3,4}-\d{4}\b'
@@ -41,10 +46,11 @@ pattern_recognizers:
       - 전화
       - 연락처
       - phone
+      - tel
 
   - name: KR_BIZ_NO                    # 한국 사업자등록번호
     supported_entity: KR_BIZ_NO
-    supported_language: en
+    supported_language: any
     patterns:
       - name: biz_no
         regex: '\b\d{3}-\d{2}-\d{5}\b'
@@ -55,7 +61,7 @@ pattern_recognizers:
 
   - name: KR_PASSPORT                  # 한국 여권번호 (예: M12345678)
     supported_entity: KR_PASSPORT
-    supported_language: en
+    supported_language: any
     patterns:
       - name: passport_kr
         regex: '\b[MSRODmsrod]\d{8}\b'
@@ -64,9 +70,22 @@ pattern_recognizers:
       - 여권
       - passport
 
+  - name: KR_ADDRESS                   # 한국 주소 (시/도 + 시/군/구/동/로/길)
+    supported_entity: KR_ADDRESS
+    supported_language: any
+    patterns:
+      - name: kr_address
+        regex: '(?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)(?:특별자치시|특별시|광역시|특별자치도|도)?\s*[가-힣]+(?:시|군|구)\s*[가-힣]+(?:동|로|길|읍|면)(?:\s*\d+(?:-\d+)?)?'
+        score: 0.75
+    context:
+      - 주소
+      - 거주지
+      - 소재지
+      - 본사
+
   - name: AWS_ACCESS_KEY               # AWS Access Key ID
     supported_entity: AWS_ACCESS_KEY
-    supported_language: en
+    supported_language: any
     patterns:
       - name: aws_access_key
         regex: '\b(AKIA|ASIA)[0-9A-Z]{16}\b'
@@ -78,7 +97,7 @@ pattern_recognizers:
 
   - name: GENERIC_API_KEY              # 일반적인 32자 이상 hex / base64 시크릿
     supported_entity: GENERIC_API_KEY
-    supported_language: en
+    supported_language: any
     patterns:
       - name: long_secret
         regex: '\b[A-Za-z0-9_\-]{32,}\b'
@@ -87,12 +106,14 @@ pattern_recognizers:
       - api_key
       - secret
       - token
+      - 비밀
+      - 키
 
 deny_list_recognizers:
 
   - name: INTERNAL_PROJECTS
     supported_entity: INTERNAL_PROJECT
-    supported_language: en
+    supported_language: any
     deny_list:
       - ProjectAlpha
       - ProjectOmega
@@ -101,8 +122,9 @@ deny_list_recognizers:
 
   - name: VIP_NAMES
     supported_entity: VIP_PERSON
-    supported_language: en
+    supported_language: any
     deny_list:
       - 홍길동
       - 김철수
+      - 이영희
     score: 0.85

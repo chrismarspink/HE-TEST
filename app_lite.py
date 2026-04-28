@@ -51,6 +51,12 @@ class Recognizer:
     deny_list: List[str] = field(default_factory=list)
     deny_list_score: float = 1.0
     context: List[str] = field(default_factory=list)
+    languages: List[str] = field(default_factory=lambda: ["any"])
+
+    def matches_language(self, language: str) -> bool:
+        if language == "auto" or "any" in self.languages:
+            return True
+        return language in self.languages
 
     def analyze(self, text: str, lower_text: str) -> List[dict]:
         out: List[dict] = []
@@ -132,7 +138,7 @@ def _build_builtin() -> List[Recognizer]:
                     0.7,
                 ),
             ],
-            context=["ip", "ipv4", "ipv6", "address"],
+            context=["ip", "ipv4", "ipv6", "address", "주소"],
         ),
         Recognizer(
             name="CreditCardRecognizer",
@@ -142,7 +148,7 @@ def _build_builtin() -> List[Recognizer]:
                 re.compile(r"\b(?:\d[ -]*?){13,19}\b"),
                 0.4,  # Luhn 검증 통과 시 후처리에서 1.0 으로 상승
             )],
-            context=["card", "credit", "신용카드", "카드번호"],
+            context=["card", "credit", "신용카드", "카드번호", "카드"],
         ),
         Recognizer(
             name="UsSsnRecognizer",
@@ -162,7 +168,7 @@ def _build_builtin() -> List[Recognizer]:
                 re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b"),
                 0.5,
             )],
-            context=["iban", "bank"],
+            context=["iban", "bank", "은행", "계좌"],
         ),
         Recognizer(
             name="UsPhoneRecognizer",
@@ -172,9 +178,20 @@ def _build_builtin() -> List[Recognizer]:
                 re.compile(r"\b(?:\+?1[ \-.])?\(?\d{3}\)?[ \-.]\d{3}[ \-.]\d{4}\b"),
                 0.5,
             )],
-            context=["phone", "tel", "전화"],
+            context=["phone", "tel", "전화", "연락처"],
         ),
     ]
+
+
+def _normalize_languages(spec) -> List[str]:
+    """Accept str / list / 'any' / None → list of languages."""
+    if spec is None:
+        return ["any"]
+    if isinstance(spec, str):
+        return [spec]
+    if isinstance(spec, list):
+        return [str(x) for x in spec] or ["any"]
+    return ["any"]
 
 
 # ---------------------------------------------------------------------------
@@ -211,9 +228,13 @@ def load_custom(path: Path) -> List[Recognizer]:
                 entity=item["supported_entity"],
                 patterns=patterns,
                 context=item.get("context") or [],
+                languages=_normalize_languages(item.get("supported_language")),
             )
         )
-        log.info("Loaded pattern recognizer: %s (%d patterns)", item["name"], len(patterns))
+        log.info(
+            "Loaded pattern recognizer: %s (%d patterns, langs=%s)",
+            item["name"], len(patterns), recs[-1].languages,
+        )
 
     for item in cfg.get("deny_list_recognizers", []) or []:
         recs.append(
@@ -222,12 +243,12 @@ def load_custom(path: Path) -> List[Recognizer]:
                 entity=item["supported_entity"],
                 deny_list=item.get("deny_list") or [],
                 deny_list_score=float(item.get("score", 1.0)),
+                languages=_normalize_languages(item.get("supported_language")),
             )
         )
         log.info(
-            "Loaded deny-list recognizer: %s (%d terms)",
-            item["name"],
-            len(item.get("deny_list") or []),
+            "Loaded deny-list recognizer: %s (%d terms, langs=%s)",
+            item["name"], len(item.get("deny_list") or []), recs[-1].languages,
         )
 
     return recs
@@ -261,10 +282,12 @@ def _luhn_ok(number: str) -> bool:
 # 분석
 # ---------------------------------------------------------------------------
 
-def analyze_text(text: str, score_threshold: float) -> List[dict]:
+def analyze_text(text: str, score_threshold: float, language: str = "auto") -> List[dict]:
     lower = text.lower()
     findings: List[dict] = []
     for r in recognizers:
+        if not r.matches_language(language):
+            continue
         findings.extend(r.analyze(text, lower))
 
     # CREDIT_CARD: Luhn 통과한 것만 신뢰도 상승, 실패한 건 점수 하락
@@ -288,15 +311,26 @@ def analyze_text(text: str, score_threshold: float) -> List[dict]:
 # 파일 → 텍스트
 # ---------------------------------------------------------------------------
 
+def _smart_decode(raw: bytes) -> str:
+    """BOM 우선 → utf-8 strict → cp949 / euc-kr → utf-8 replace."""
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return raw[3:].decode("utf-8", errors="replace")
+    if raw.startswith(b"\xff\xfe"):
+        return raw[2:].decode("utf-16-le", errors="replace")
+    if raw.startswith(b"\xfe\xff"):
+        return raw[2:].decode("utf-16-be", errors="replace")
+    for enc in ("utf-8", "cp949", "euc-kr"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 def extract_text(filename: str, raw: bytes) -> str:
     ext = Path(filename).suffix.lower()
     if ext in {".txt", ".log", ".csv", ".json", ".md", ".yaml", ".yml", ".xml", ".html"}:
-        for enc in ("utf-8", "cp949", "euc-kr", "latin-1"):
-            try:
-                return raw.decode(enc)
-            except UnicodeDecodeError:
-                continue
-        return raw.decode("utf-8", errors="replace")
+        return _smart_decode(raw)
 
     if ext == ".pdf":
         from pypdf import PdfReader
@@ -313,10 +347,7 @@ def extract_text(filename: str, raw: bytes) -> str:
                     parts.append(cell.text)
         return "\n".join(parts)
 
-    try:
-        return raw.decode("utf-8")
-    except UnicodeDecodeError:
-        return raw.decode("utf-8", errors="replace")
+    return _smart_decode(raw)
 
 
 # ---------------------------------------------------------------------------
@@ -343,6 +374,7 @@ def list_recognizers():
         {
             "name": r.name,
             "supported_entities": [r.entity],
+            "languages": r.languages,
             "supported_language": "any",
         }
         for r in recognizers
@@ -375,6 +407,9 @@ def analyze():
     f = request.files["file"]
     raw = f.read()
     score_threshold = float(request.form.get("score_threshold", 0.3))
+    language = (request.form.get("language") or "auto").strip().lower()
+    if language not in ("auto", "ko", "en"):
+        language = "auto"
 
     try:
         text = extract_text(f.filename or "uploaded", raw)
@@ -382,7 +417,7 @@ def analyze():
         log.exception("extract_text failed")
         return jsonify({"ok": False, "message": f"failed to read file: {e}"}), 400
 
-    findings = analyze_text(text, score_threshold)
+    findings = analyze_text(text, score_threshold, language=language)
 
     summary: dict[str, int] = {}
     for f_ in findings:
@@ -394,6 +429,7 @@ def analyze():
             "filename": f.filename,
             "char_count": len(text),
             "score_threshold": score_threshold,
+            "language": language,
             "summary": summary,
             "findings": findings,
             "text": text,
