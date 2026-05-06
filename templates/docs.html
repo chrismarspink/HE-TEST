@@ -325,6 +325,43 @@ ct     = Enc(token)
   용어는 <b>W3C DPV 2.0</b> 의 <code>dpv-pd:*</code> compact IRI 를 사용합니다.
 </p>
 
+<h3>처리 흐름 (시각화)</h3>
+<div style="background:#0b0d12; border:1px solid var(--line); border-radius:8px; padding:14px; overflow-x:auto;">
+<svg viewBox="0 0 1260 230" xmlns="http://www.w3.org/2000/svg"
+     style="display:block; min-width:780px; max-width:100%; height:auto; font-family:-apple-system,'Segoe UI',Roboto,'Noto Sans KR',sans-serif;">
+  <defs>
+    <marker id="pf-arr-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#4f8cff"/>
+    </marker>
+  </defs>
+  <style>
+    .pfd-box { fill:#181b22; stroke:#2a2f3a; stroke-width:1; }
+    .pfd-title { fill:#e6e8ee; font-size:13px; font-weight:600; }
+    .pfd-sub { fill:#9aa3b2; font-size:11px; }
+    .pfd-num { fill:#4f8cff; font-size:10px; font-weight:700; font-family:ui-monospace,Consolas,monospace; }
+    .pfd-arrow { stroke:#4f8cff; stroke-width:1.8; fill:none; }
+    .pfd-vbox { fill:#0a1d18; stroke:#06d6a0; stroke-width:1.5; }
+    .pfd-vtitle { fill:#06d6a0; font-size:12px; font-weight:700; }
+    .pfd-vtext { fill:#9aa3b2; font-size:11px; }
+  </style>
+  <g transform="translate(10,20)"><rect class="pfd-box" width="150" height="90" rx="6"/><text class="pfd-num" x="10" y="16">STEP 1</text><text class="pfd-title" x="75" y="38" text-anchor="middle">입력</text><text class="pfd-sub" x="75" y="58" text-anchor="middle">파일 · 텍스트</text><text class="pfd-sub" x="75" y="74" text-anchor="middle">.txt .pdf .docx .hwp</text></g>
+  <line class="pfd-arrow" x1="162" y1="65" x2="188" y2="65" marker-end="url(#pf-arr-d)"/>
+  <g transform="translate(190,20)"><rect class="pfd-box" width="150" height="90" rx="6"/><text class="pfd-num" x="10" y="16">STEP 2</text><text class="pfd-title" x="75" y="38" text-anchor="middle">PII 검출</text><text class="pfd-sub" x="75" y="58" text-anchor="middle">정규식 · 키워드</text><text class="pfd-sub" x="75" y="74" text-anchor="middle">+ NER</text></g>
+  <line class="pfd-arrow" x1="342" y1="65" x2="368" y2="65" marker-end="url(#pf-arr-d)"/>
+  <g transform="translate(370,20)"><rect class="pfd-box" width="150" height="90" rx="6"/><text class="pfd-num" x="10" y="16">STEP 3</text><text class="pfd-title" x="75" y="38" text-anchor="middle">DPV 매핑</text><text class="pfd-sub" x="75" y="58" text-anchor="middle">W3C DPV 2.0</text><text class="pfd-sub" x="75" y="74" text-anchor="middle">dpv-pd: 카테고리</text></g>
+  <line class="pfd-arrow" x1="522" y1="65" x2="548" y2="65" marker-end="url(#pf-arr-d)"/>
+  <g transform="translate(550,20)"><rect class="pfd-box" width="150" height="90" rx="6"/><text class="pfd-num" x="10" y="16">STEP 4</text><text class="pfd-title" x="75" y="38" text-anchor="middle">관할 분류</text><text class="pfd-sub" x="75" y="58" text-anchor="middle">direct · quasi</text><text class="pfd-sub" x="75" y="74" text-anchor="middle">sensitive · secret</text></g>
+  <line class="pfd-arrow" x1="702" y1="65" x2="728" y2="65" marker-end="url(#pf-arr-d)"/>
+  <g transform="translate(730,20)"><rect class="pfd-box" width="150" height="90" rx="6"/><text class="pfd-num" x="10" y="16">STEP 5</text><text class="pfd-title" x="75" y="38" text-anchor="middle">기법 선택</text><text class="pfd-sub" x="75" y="58" text-anchor="middle">ISO/IEC 20889</text><text class="pfd-sub" x="75" y="74" text-anchor="middle">§7 — §8</text></g>
+  <line class="pfd-arrow" x1="882" y1="65" x2="908" y2="65" marker-end="url(#pf-arr-d)"/>
+  <g transform="translate(910,20)"><rect class="pfd-box" width="150" height="90" rx="6"/><text class="pfd-num" x="10" y="16">STEP 6</text><text class="pfd-title" x="75" y="38" text-anchor="middle">변환 적용</text><text class="pfd-sub" x="75" y="58" text-anchor="middle">tokenize · mask</text><text class="pfd-sub" x="75" y="74" text-anchor="middle">generalize · suppress</text></g>
+  <line class="pfd-arrow" x1="1062" y1="65" x2="1088" y2="65" marker-end="url(#pf-arr-d)"/>
+  <g transform="translate(1090,20)"><rect class="pfd-box" width="150" height="90" rx="6"/><text class="pfd-num" x="10" y="16">STEP 7</text><text class="pfd-title" x="75" y="38" text-anchor="middle">준수 평가</text><text class="pfd-sub" x="75" y="58" text-anchor="middle">ISO/IEC 27559</text><text class="pfd-sub" x="75" y="74" text-anchor="middle">KR · JP · US · EU</text></g>
+  <path class="pfd-arrow" d="M 1165 110 V 140 H 630 V 156" marker-end="url(#pf-arr-d)"/>
+  <g transform="translate(330,160)"><rect class="pfd-vbox" width="600" height="55" rx="6"/><text class="pfd-vtitle" x="300" y="22" text-anchor="middle">VERDICT &amp; RATIONALE</text><text class="pfd-vtext" x="300" y="42" text-anchor="middle">compliant · partial · insufficient  +  근거 + 잔여 요구사항 (관할별 카드)</text></g>
+</svg>
+</div>
+
 <h3>처리 7단계 (ISO 27559 정렬)</h3>
 <ol>
   <li><b>입력</b> — 파일(.txt .csv .json .pdf .docx .hwp) 또는 인라인 텍스트</li>
