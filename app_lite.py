@@ -403,6 +403,46 @@ def reload_patterns():
         return jsonify({"ok": False, "message": str(e)}), 500
 
 
+@app.route("/api/pseudonymize", methods=["POST"])
+def pseudonymize():
+    """가명화/익명화 PoC — PII Scanner 결과를 받아 ISO 20889 기법 적용."""
+    import pseudo_framework as pf
+
+    if "file" in request.files:
+        f = request.files["file"]
+        raw = f.read()
+        try:
+            text = extract_text(f.filename or "uploaded", raw)
+        except Exception as e:  # noqa: BLE001
+            return jsonify({"ok": False, "message": f"파일 읽기 실패: {e}"}), 400
+        filename = f.filename
+    else:
+        text = request.form.get("text") or ""
+        filename = "<inline>"
+    if not text:
+        return jsonify({"ok": False, "message": "text 가 비어있습니다"}), 400
+
+    score_threshold = float(request.form.get("score_threshold", 0.3))
+    language = (request.form.get("language") or "auto").strip().lower()
+    if language not in ("auto", "ko", "en"):
+        language = "auto"
+    jurisdictions = [j.strip().upper() for j in (request.form.get("jurisdictions") or "KR,JP,US,EU").split(",") if j.strip()]
+    treatment_level = (request.form.get("treatment_level") or "pseudonymization").strip().lower()
+
+    findings = analyze_text(text, score_threshold, language=language)
+
+    result = pf.run(text, findings, jurisdictions, treatment_level)
+    result.update({
+        "ok": True,
+        "filename": filename,
+        "language": language,
+        "score_threshold": score_threshold,
+        "char_count": len(text),
+        "findings_raw_count": len(findings),
+    })
+    return jsonify(result)
+
+
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
     if "file" not in request.files:

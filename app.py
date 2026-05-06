@@ -259,6 +259,44 @@ def reload_patterns():
         return jsonify({"ok": False, "message": str(e)}), 500
 
 
+def _run_analysis(text: str, score_threshold: float, language: str):
+    """auto / ko / en 분석 → (findings, target_langs)."""
+    if language == "auto" or language not in SUPPORTED_LANGUAGES:
+        target_langs = list(SUPPORTED_LANGUAGES)
+    else:
+        target_langs = [language]
+
+    raw_results = []
+    for lang in target_langs:
+        try:
+            raw_results.extend(analyzer.analyze(
+                text=text, language=lang, score_threshold=score_threshold,
+            ))
+        except Exception as e:  # noqa: BLE001
+            log.warning("analyze(%s) failed: %s", lang, e)
+
+    dedup: dict = {}
+    for r in raw_results:
+        k = (r.start, r.end, r.entity_type)
+        if k not in dedup or dedup[k].score < r.score:
+            dedup[k] = r
+    results = list(dedup.values())
+
+    findings = []
+    for r in results:
+        findings.append({
+            "entity_type": r.entity_type,
+            "start": r.start,
+            "end": r.end,
+            "score": round(float(r.score), 3),
+            "text": text[r.start : r.end],
+            "recognizer": (r.recognition_metadata.get("recognizer_name")
+                           if r.recognition_metadata else None),
+        })
+    findings.sort(key=lambda x: (x["start"], -x["score"]))
+    return findings, target_langs
+
+
 @app.route("/api/analyze", methods=["POST"])
 def analyze():
     if "file" not in request.files:
@@ -275,48 +313,7 @@ def analyze():
         log.exception("extract_text failed")
         return jsonify({"ok": False, "message": f"failed to read file: {e}"}), 400
 
-    # auto = 설치된 모든 언어로 분석 후 (start, end, entity_type) 으로 dedup
-    if language == "auto" or language not in SUPPORTED_LANGUAGES:
-        target_langs = list(SUPPORTED_LANGUAGES)
-    else:
-        target_langs = [language]
-
-    raw_results = []
-    for lang in target_langs:
-        try:
-            raw_results.extend(analyzer.analyze(
-                text=text, language=lang, score_threshold=score_threshold,
-            ))
-        except Exception as e:  # noqa: BLE001
-            log.warning("analyze(%s) failed: %s", lang, e)
-
-    # dedup: 같은 위치/엔티티 중 최고 score 만 유지
-    dedup: dict = {}
-    for r in raw_results:
-        k = (r.start, r.end, r.entity_type)
-        if k not in dedup or dedup[k].score < r.score:
-            dedup[k] = r
-    results = list(dedup.values())
-
-    findings = []
-    for r in results:
-        snippet = text[r.start : r.end]
-        findings.append(
-            {
-                "entity_type": r.entity_type,
-                "start": r.start,
-                "end": r.end,
-                "score": round(float(r.score), 3),
-                "text": snippet,
-                "recognizer": (
-                    r.recognition_metadata.get("recognizer_name")
-                    if r.recognition_metadata
-                    else None
-                ),
-            }
-        )
-
-    findings.sort(key=lambda x: (x["start"], -x["score"]))
+    findings, target_langs = _run_analysis(text, score_threshold, language)
 
     summary: dict[str, int] = {}
     for f_ in findings:
@@ -335,6 +332,45 @@ def analyze():
             "text": text,
         }
     )
+
+
+@app.route("/api/pseudonymize", methods=["POST"])
+def pseudonymize():
+    """가명화/익명화 PoC — Presidio 검출 결과에 ISO 20889 기법 적용."""
+    import pseudo_framework as pf
+
+    if "file" in request.files:
+        f = request.files["file"]
+        raw = f.read()
+        try:
+            text = extract_text(f.filename or "uploaded", raw)
+        except Exception as e:  # noqa: BLE001
+            return jsonify({"ok": False, "message": f"파일 읽기 실패: {e}"}), 400
+        filename = f.filename
+    else:
+        text = request.form.get("text") or ""
+        filename = "<inline>"
+    if not text:
+        return jsonify({"ok": False, "message": "text 가 비어있습니다"}), 400
+
+    score_threshold = float(request.form.get("score_threshold", 0.3))
+    language = (request.form.get("language") or "auto").strip().lower()
+    jurisdictions = [j.strip().upper() for j in (request.form.get("jurisdictions") or "KR,JP,US,EU").split(",") if j.strip()]
+    treatment_level = (request.form.get("treatment_level") or "pseudonymization").strip().lower()
+
+    findings, target_langs = _run_analysis(text, score_threshold, language)
+
+    result = pf.run(text, findings, jurisdictions, treatment_level)
+    result.update({
+        "ok": True,
+        "filename": filename,
+        "language": language,
+        "languages_used": target_langs,
+        "score_threshold": score_threshold,
+        "char_count": len(text),
+        "findings_raw_count": len(findings),
+    })
+    return jsonify(result)
 
 
 if __name__ == "__main__":

@@ -82,6 +82,7 @@
     <li><a href="#noise">노이즈 예산 (Noise Budget)</a></li>
     <li><a href="#pattern">패턴 매칭 트릭 — 다항식 zero-test</a></li>
     <li><a href="#keyword">키워드/와일드카드 검색 — 토큰 단위 HE 매칭</a></li>
+    <li><a href="#pseudo">가명화/익명화 프레임워크 — KR·JP·US·EU + DPV</a></li>
     <li><a href="#privacy">본 데모의 프라이버시 모델</a></li>
     <li><a href="#caveats">실제 운영 시 고려사항</a></li>
     <li><a href="#refs">참고 자료</a></li>
@@ -315,7 +316,91 @@ ct     = Enc(token)
   필요하면 같은 패턴 매칭 트릭을 여러 자리에 일반화해 char class 까지 확장 가능 (위 한계를 감수하면).
 </p>
 
-<h2 id="privacy">9. 본 데모의 프라이버시 모델</h2>
+<h2 id="pseudo">9. 가명화/익명화 프레임워크 — KR·JP·US·EU</h2>
+
+<p>
+  탭 5 의 "가명화/익명화" 는 PII Scanner 의 검출 결과를
+  <b>ISO/IEC 20889</b>(기법 분류) 에 따라 변환하고
+  <b>ISO/IEC 27559</b>(절차 프레임워크) 의 흐름에 맞춰 4개 관할의 법령에 대한 준수 여부를 평가합니다.
+  용어는 <b>W3C DPV 2.0</b> 의 <code>dpv-pd:*</code> compact IRI 를 사용합니다.
+</p>
+
+<h3>처리 7단계 (ISO 27559 정렬)</h3>
+<ol>
+  <li><b>입력</b> — 파일(.txt .csv .json .pdf .docx .hwp) 또는 인라인 텍스트</li>
+  <li><b>PII 검출</b> — Presidio (또는 lite) 의 정규식·키워드·NER 결합</li>
+  <li><b>DPV 매핑</b> — 각 entity_type → <code>dpv-pd:NationalIdentificationNumber</code> 등</li>
+  <li><b>관할별 분류</b> — direct identifier / quasi-identifier / sensitive / secret</li>
+  <li><b>기법 선택</b> — ISO 20889 §7~§8 카탈로그에서 entity 별 기법 자동 매핑</li>
+  <li><b>변환 적용</b> — 위치 역순으로 in-place 치환 (인덱스 유지)</li>
+  <li><b>준수 평가</b> — 관할별 verdict (compliant / partial / insufficient) + 근거 + 잔여 요구사항</li>
+</ol>
+
+<h3>관할별 핵심 기준 (요지)</h3>
+<table>
+  <thead><tr><th>관할</th><th>법령 / 표준</th><th>가명화·익명화 정의의 핵심</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>🇰🇷 KR</td>
+      <td>개인정보보호법 §2·§28-2~7 + PIPC 가명정보 처리 가이드라인</td>
+      <td>가명: 추가정보 없이는 식별 불가 (분리 보관 의무). 익명: 어떤 추가정보로도 복원 불가. 적정성 검토위원회 절차</td>
+    </tr>
+    <tr>
+      <td>🇯🇵 JP</td>
+      <td>個人情報保護法 (APPI) §16-2·§35-2·§43 + PPC 작성기준</td>
+      <td>仮名加工: 추가정보로 식별 가능 / 안전관리조치. 匿名加工: 復元不可能 + 작성방법 등 공표</td>
+    </tr>
+    <tr>
+      <td>🇺🇸 US</td>
+      <td>HIPAA Safe Harbor (45 CFR §164.514(b)(2)) · CCPA/CPRA · NIST SP 800-188</td>
+      <td>HIPAA SH: 18가지 식별자 모두 제거/일반화. CCPA deidentified: cannot reasonably identify + 통제. Expert Determination 트랙도 가능</td>
+    </tr>
+    <tr>
+      <td>🇪🇺 EU</td>
+      <td>GDPR Art 4(5), Recital 26 · EDPB Guidelines 01/2025 · WP29 Op 05/2014</td>
+      <td>Pseudonymisation: 추가정보 분리 + 기술·조직적 조치. Anonymisation: <b>singling-out / linkability / inference</b> 3개 위험 모두 제거</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>구현된 기법 (ISO 20889 인용)</h3>
+<table>
+  <thead><tr><th>기법 ID</th><th>분류</th><th>적용 entity 예</th></tr></thead>
+  <tbody>
+    <tr><td><code>tokenize_random</code></td><td>§8.4 Tokenization (random)</td><td>KR_RRN, US_SSN, KR_PASSPORT, INTERNAL_PROJECT</td></tr>
+    <tr><td><code>pseudonym_consistent</code></td><td>§8.4 Pseudonymisation (HMAC-BLAKE2b)</td><td>VIP_PERSON (이름)</td></tr>
+    <tr><td><code>mask_partial</code></td><td>§7.5 Masking</td><td>전화·휴대폰·IBAN·사업자번호</td></tr>
+    <tr><td><code>mask_pan</code></td><td>PCI-DSS 정합 마스킹</td><td>CREDIT_CARD</td></tr>
+    <tr><td><code>hash_local_keep_domain</code></td><td>§8.4 Cryptographic (HMAC)</td><td>EMAIL_ADDRESS</td></tr>
+    <tr><td><code>generalize_to_city</code></td><td>§7.2 Generalization</td><td>KR_ADDRESS</td></tr>
+    <tr><td><code>generalize_url</code></td><td>§7.2 Generalization</td><td>URL (호스트만 유지)</td></tr>
+    <tr><td><code>ip_truncate</code></td><td>§7.2 Generalization (/24)</td><td>IP_ADDRESS</td></tr>
+    <tr><td><code>suppress</code></td><td>§7.4 Suppression</td><td>AWS_ACCESS_KEY, GENERIC_API_KEY</td></tr>
+  </tbody>
+</table>
+
+<h3>익명화 모드의 강화점</h3>
+<p>
+  탭 UI 에서 "익명화" 를 선택하면 <code>pseudonym_consistent</code> 와 <code>tokenize_random</code> 에서
+  <b>동일성 매핑</b>(같은 입력에 같은 토큰) 을 끕니다. 같은 사람이 두 번 등장해도 다른 토큰을 부여 — 연결성(linkability) 차단.
+  단 진정한 익명화는 통계적 검증(k-익명성·l-다양성·t-근접성) 과 <b>매핑 테이블 폐기</b> 가 함께 필요하다는 점을
+  판정 카드의 "잔여 요구사항" 에 명시합니다.
+</p>
+
+<div class="danger">
+<b>운영 환경 전환 시 필수 추가 사항</b>
+<ul>
+  <li>매핑 테이블(GDPR Art 4(5) 의 "additional information") 은 응답에 포함하지 말 것 — 본 PoC 는 학습용으로 노출</li>
+  <li>매핑 키는 KMS/HSM 또는 별도 데이터스토어 (RBAC + 감사로그) 에 분리 보관</li>
+  <li>준식별자 조합에 대한 정량적 재식별 위험 평가 — k-anonymity 등</li>
+  <li>(KR) 가명정보 적정성 검토위원회 의사록 보관</li>
+  <li>(JP) 匿名加工情報의 작성방법 공표 (APPI §43)</li>
+  <li>(US/HIPAA) 18 식별자 외 "any other unique identifying number/code" 도 검토</li>
+  <li>(EU) Art 32 — 적절한 보안 조치 + 데이터 보호 영향평가(DPIA) 필요 시 수행</li>
+</ul>
+</div>
+
+<h2 id="privacy">10. 본 데모의 프라이버시 모델</h2>
 <pre>
 ┌─────────── CLIENT (data owner) ───────────┐
 │ 보유: EncParms, publicKey, secretKey,       │
@@ -341,7 +426,7 @@ ct     = Enc(token)
   <li>탭 2(SEAL)·탭 3(RRN Search) 모두 같은 모델 — 다만 본 브라우저 데모에서는 클라이언트와 서버 역할이 같은 페이지에서 시뮬레이션되어 있을 뿐</li>
 </ul>
 
-<h2 id="caveats">10. 실제 운영 시 고려사항</h2>
+<h2 id="caveats">11. 실제 운영 시 고려사항</h2>
 <ul>
   <li><b>비밀키 분리</b> — 데모는 편의상 brower 메모리에 두고 화면에도 보여주지만, 실제 시스템은 KMS/HSM/TPM 또는 보안 엔클레이브에서만 사용해야 함</li>
   <li><b>매개변수 선택</b> — security level (HE Standard 권장 128bit), poly_modulus_degree, plain_modulus 는 위협 모델·연산 깊이·성능 요구 균형으로 결정</li>
@@ -351,7 +436,7 @@ ct     = Enc(token)
   <li><b>RRN 검색의 부정확성</b> — 정규식 추출에 의존하므로 띄어쓰기·특수문자가 끼어든 변형은 보강 필요. 진짜 양방향 PSI 가 필요하면 OPRF + HE 조합 또는 PIR 사용</li>
 </ul>
 
-<h2 id="refs">11. 참고 자료</h2>
+<h2 id="refs">12. 참고 자료</h2>
 <ul>
   <li><a href="https://github.com/microsoft/SEAL" target="_blank">Microsoft SEAL</a> — C++ 본체 라이브러리</li>
   <li><a href="https://github.com/morfix-io/node-seal" target="_blank">node-seal</a> — JS/WASM 래퍼 (본 데모가 사용)</li>

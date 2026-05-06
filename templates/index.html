@@ -124,6 +124,7 @@
   <button class="tab-btn" data-tab="seal">SEAL (Homomorphic Encryption)</button>
   <button class="tab-btn" data-tab="rrn">RRN Search (HE)</button>
   <button class="tab-btn" data-tab="kw">Keyword Search (HE)</button>
+  <button class="tab-btn" data-tab="pseudo">가명화/익명화 (KR·JP·US·EU)</button>
 </div>
 
 <!-- ========================= TAB 1 : PII SCANNER ========================= -->
@@ -540,6 +541,118 @@ tk_******_42
     </div>
   </div>
 
+</div>
+</div>
+
+<!-- ========================= TAB 5 : Pseudonymization Framework ========================= -->
+<div id="tab-pseudo" class="tab-panel">
+
+<div class="card">
+  <h2>처리 흐름 — ISO/IEC 27559 기반 PoC</h2>
+<pre style="background:#0b0d12; border:1px solid var(--line); border-radius:8px; padding:12px; font-size:12px; line-height:1.55; color:var(--muted); overflow-x:auto;">
+ ┌──────┐    ┌────────┐    ┌─────────┐    ┌──────────┐    ┌──────────┐    ┌────────┐    ┌──────────┐
+ │ 입력 │ →  │ PII    │ →  │ DPV     │ →  │ 관할별   │ →  │ 기법 선택│ →  │ 변환   │ →  │ 준수 평가│
+ │ 파일/│    │ 검출   │    │ 매핑    │    │ 분류     │    │ ISO20889 │    │ 적용   │    │ ISO27559 │
+ │ 텍스트│    │ regex+ │    │ dpv-pd: │    │ direct/  │    │ tokenize │    │ in-place│   │ KR·JP·US·│
+ │      │    │ NER    │    │ Email…  │    │ quasi/   │    │ /mask/   │    │ replace │    │ EU 매트릭스│
+ │      │    │        │    │         │    │ sensitive│    │ generalize│    │        │    │ + 근거    │
+ └──────┘    └────────┘    └─────────┘    └──────────┘    └──────────┘    └────────┘    └──────────┘
+                                                                                              │
+                                                                                              ▼
+                                                                              [verdict: compliant / partial / insufficient + rationale]
+</pre>
+  <div style="font-size:12px; color:var(--muted); margin-top:6px;">
+    표준 인용: <b>ISO/IEC 20889</b> (기법 분류) · <b>ISO/IEC 27559</b> (절차) · 용어는 <b>W3C DPV 2.0</b>.
+    법령: <b>KR</b> 개인정보보호법 + 가명정보 처리 가이드라인 · <b>JP</b> APPI 仮名加工·匿名加工 ·
+    <b>US</b> HIPAA Safe Harbor + CCPA + NIST 800-188 · <b>EU</b> GDPR Art 4(5) + EDPB 01/2025.
+    본 PoC 는 휴리스틱 판정 — 실 운영 시 법무·통계 검토 필수.
+  </div>
+</div>
+
+<div class="row">
+
+  <div class="col">
+    <div class="card">
+      <h2>1. 입력 / 옵션</h2>
+      <label>Document text</label>
+      <textarea id="pseudo-text" rows="9">[고객 명단]
+이름: 홍길동
+주민등록번호: 901231-1234567
+휴대폰: 010-1234-5678
+이메일: gildong.hong@example.com
+주소: 서울특별시 강남구 테헤란로 123
+
+[기타]
+신용카드: 4111-1111-1111-1111
+AWS Key: AKIAIOSFODNN7EXAMPLE
+서버: https://srv-01.internal.acme.com/health (192.168.10.42)
+</textarea>
+      <label style="margin-top:10px; display:block;">또는 파일 업로드 <span style="color:var(--muted);">(.txt .csv .json .pdf .docx .hwp)</span></label>
+      <input id="pseudo-file" type="file" />
+
+      <label style="margin-top:12px; display:block;">관할 (Jurisdictions)</label>
+      <div class="row-line">
+        <label><input type="checkbox" name="pseudo-juris" value="KR" checked> 🇰🇷 KR</label>
+        <label><input type="checkbox" name="pseudo-juris" value="JP" checked> 🇯🇵 JP</label>
+        <label><input type="checkbox" name="pseudo-juris" value="US" checked> 🇺🇸 US</label>
+        <label><input type="checkbox" name="pseudo-juris" value="EU" checked> 🇪🇺 EU</label>
+      </div>
+
+      <label style="margin-top:10px; display:block;">처리 수준 <span style="color:var(--muted);">(목적)</span></label>
+      <div class="row-line">
+        <label><input type="radio" name="pseudo-level" value="pseudonymization" checked> 가명화 (Pseudonymisation)</label>
+        <label><input type="radio" name="pseudo-level" value="anonymization"> 익명화 (Anonymisation)</label>
+      </div>
+      <p style="color:var(--muted); font-size:11.5px; margin-top:6px;">
+        가명화: 매핑 분리 보관 시 식별 가능 (GDPR Art 4(5), KR PIPA §28-2). 익명화: 어떤 합리적 수단으로도 재식별 불가.
+      </p>
+
+      <label style="margin-top:8px; display:block;">Score threshold <span style="color:var(--muted);">(검출 임계치)</span></label>
+      <input id="pseudo-thresh" type="number" step="0.05" min="0" max="1" value="0.3" />
+
+      <div class="row-line">
+        <button id="pseudo-run">Run Framework</button>
+        <span id="pseudo-status" class="empty">대기 중</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2. 처리 결과 — 원문 vs 변환문</h2>
+      <table>
+        <thead><tr><th style="width:50%;">원문 (Original)</th><th>변환문 (Transformed)</th></tr></thead>
+        <tbody><tr>
+          <td><pre class="preview" id="pseudo-orig" style="margin:0;"><span class="empty">실행 후 표시됩니다.</span></pre></td>
+          <td><pre class="preview" id="pseudo-out" style="margin:0;"><span class="empty">실행 후 표시됩니다.</span></pre></td>
+        </tr></tbody>
+      </table>
+      <div class="row-line">
+        <button class="secondary mini" id="pseudo-dl-text" disabled>변환문 다운로드 (.txt)</button>
+        <button class="secondary mini" id="pseudo-dl-json" disabled>전체 결과 다운로드 (.json)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h2>3. 검출 엔티티 → DPV → 분류 → 기법</h2>
+      <table id="pseudo-entities">
+        <thead><tr>
+          <th>#</th><th>Entity</th><th>DPV (W3C)</th><th>관할 분류</th><th>기법 (ISO 20889)</th><th>변환</th>
+        </tr></thead>
+        <tbody><tr><td colspan="6" class="empty">실행 후 표시됩니다.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>4. 규제별 준수 판정</h2>
+      <div id="pseudo-verdicts"><span class="empty">실행 후 표시됩니다.</span></div>
+    </div>
+
+    <div class="card">
+      <h2>5. 처리 로그</h2>
+      <pre class="log" id="pseudo-log"></pre>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -1607,6 +1720,183 @@ kwUI.run.addEventListener('click', async () => {
   } finally {
     kwUI.run.disabled = false;
   }
+});
+
+/* ========================= TAB 5 : Pseudonymization Framework ========================= */
+const psUI = {
+  text:   document.getElementById('pseudo-text'),
+  file:   document.getElementById('pseudo-file'),
+  thresh: document.getElementById('pseudo-thresh'),
+  run:    document.getElementById('pseudo-run'),
+  status: document.getElementById('pseudo-status'),
+  orig:   document.getElementById('pseudo-orig'),
+  out:    document.getElementById('pseudo-out'),
+  entRows: document.querySelector('#pseudo-entities tbody'),
+  verdicts: document.getElementById('pseudo-verdicts'),
+  log:    document.getElementById('pseudo-log'),
+  dlText: document.getElementById('pseudo-dl-text'),
+  dlJson: document.getElementById('pseudo-dl-json'),
+};
+let _psResult = null;
+
+function psLog(msg) {
+  const t = new Date().toTimeString().slice(0, 8);
+  psUI.log.textContent += `[${t}] ${msg}\n`;
+  psUI.log.scrollTop = psUI.log.scrollHeight;
+}
+
+function psClassPill(cls) {
+  const map = {
+    direct:    'bad',
+    sensitive: 'bad',
+    secret:    'bad',
+    quasi:     'warn',
+    unmapped:  '',
+  };
+  return map[cls] || '';
+}
+
+function psVerdictPill(v) {
+  return v === 'compliant' ? 'ok' : (v === 'partial' ? 'warn' : 'bad');
+}
+
+function psVerdictText(v) {
+  return v === 'compliant' ? '✓ 준수' : (v === 'partial' ? '⚠ 부분 준수' : '✗ 미흡');
+}
+
+const PS_FLAG = { KR: '🇰🇷', JP: '🇯🇵', US: '🇺🇸', EU: '🇪🇺' };
+
+psUI.run.addEventListener('click', async () => {
+  psUI.run.disabled = true;
+  psUI.status.textContent = '진행 중...';
+  psUI.log.textContent = '';
+  psUI.entRows.innerHTML = '<tr><td colspan="6" class="empty">…</td></tr>';
+  psUI.verdicts.innerHTML = '<span class="empty">…</span>';
+  psUI.dlText.disabled = psUI.dlJson.disabled = true;
+
+  try {
+    const fd = new FormData();
+
+    if (psUI.file.files.length) {
+      fd.append('file', psUI.file.files[0]);
+      psLog(`입력: 파일 ${psUI.file.files[0].name}`);
+    } else {
+      fd.append('text', psUI.text.value);
+      psLog(`입력: inline 텍스트 ${psUI.text.value.length} chars`);
+    }
+
+    const jurs = Array.from(document.querySelectorAll('input[name="pseudo-juris"]:checked')).map(i => i.value);
+    if (!jurs.length) { alert('관할을 1개 이상 선택하세요.'); return; }
+    fd.append('jurisdictions', jurs.join(','));
+    psLog(`관할: ${jurs.join(', ')}`);
+
+    const level = document.querySelector('input[name="pseudo-level"]:checked').value;
+    fd.append('treatment_level', level);
+    psLog(`처리 수준: ${level === 'pseudonymization' ? '가명화 (Pseudonymisation)' : '익명화 (Anonymisation)'}`);
+
+    fd.append('language', 'auto');
+    fd.append('score_threshold', psUI.thresh.value || '0.3');
+
+    psLog('서버에 요청 — POST /api/pseudonymize');
+    const res = await fetch('/api/pseudonymize', { method: 'POST', body: fd });
+    const j = await res.json();
+    if (!j.ok) { psLog('FAIL: ' + j.message); alert(j.message); return; }
+    _psResult = j;
+
+    psLog(`PII 검출: ${j.findings_raw_count}건 → 비겹침 ${j.entities.length}건`);
+    psLog(`변환 완료: ${j.transformed_text.length} chars`);
+    psLog(`판정 ${j.verdicts.length}개 관할 평가됨`);
+    renderPseudo(j);
+
+    psUI.status.innerHTML =
+      `<span class="pill ok">완료</span> ${j.entities.length} entities · `
+      + j.verdicts.map(v => `${PS_FLAG[v.jurisdiction]||v.jurisdiction} <span class="pill ${psVerdictPill(v.verdict)}">${psVerdictText(v.verdict)}</span>`).join(' ');
+
+    psUI.dlText.disabled = false;
+    psUI.dlJson.disabled = false;
+  } catch (e) {
+    psLog('ERROR: ' + e);
+    alert('실행 실패: ' + e);
+  } finally {
+    psUI.run.disabled = false;
+  }
+});
+
+function renderPseudo(j) {
+  // 원문 / 변환문
+  psUI.orig.textContent = j.original_text;
+  psUI.out.textContent  = j.transformed_text;
+
+  // 엔티티 표
+  if (!j.entities.length) {
+    psUI.entRows.innerHTML = '<tr><td colspan="6" class="empty">검출된 엔티티 없음</td></tr>';
+  } else {
+    psUI.entRows.innerHTML = j.entities.map(e => {
+      const clsCells = Object.entries(e.classifications)
+        .map(([k, v]) => `${PS_FLAG[k]||k} <span class="pill ${psClassPill(v)}">${escapeHtml(v)}</span>`)
+        .join('<br>');
+      return `<tr>
+        <td>${e.index}</td>
+        <td><span class="pill">${escapeHtml(e.entity_type)}</span><br>
+            <small style="color:var(--muted);">score ${e.score}</small></td>
+        <td><code class="mono">${escapeHtml(e.dpv_concept)}</code><br>
+            <small style="color:var(--muted);">${escapeHtml(e.dpv_note)}</small></td>
+        <td style="font-size:11px; line-height:1.6;">${clsCells}</td>
+        <td><b>${escapeHtml(e.technique)}</b><br>
+            <small style="color:var(--muted);">${escapeHtml(e.technique_note)}</small><br>
+            <small style="color:var(--muted);">DPV: <code class="mono">${escapeHtml(e.technique_dpv)}</code></small></td>
+        <td><code class="mono" style="background:rgba(239,71,111,.1); padding:1px 4px; border-radius:3px;">${escapeHtml(e.original)}</code>
+            <br>↓<br>
+            <code class="mono" style="background:rgba(6,214,160,.1); padding:1px 4px; border-radius:3px;">${escapeHtml(e.transformed)}</code></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // 관할별 판정
+  psUI.verdicts.innerHTML = j.verdicts.map(v => `
+    <div style="border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:10px; background:#0b0d12;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div><b>${PS_FLAG[v.jurisdiction]||''} ${escapeHtml(v.jurisdiction)} · ${escapeHtml(v.name)}</b></div>
+        <span class="pill ${psVerdictPill(v.verdict)}">${psVerdictText(v.verdict)}</span>
+      </div>
+      <div style="font-size:12px; color:var(--muted); margin:4px 0;">
+        <a href="${v.url}" target="_blank" style="color:var(--accent);">${escapeHtml(v.law)}</a>
+      </div>
+      <div style="font-size:12px; margin:6px 0;">
+        검출 분류 — direct <b>${v.counts.direct||0}</b> · quasi <b>${v.counts.quasi||0}</b> · sensitive <b>${v.counts.sensitive||0}</b> · secret <b>${v.counts.secret||0}</b>
+      </div>
+      <div style="font-size:12px; color:var(--muted); margin:8px 0; padding:6px 8px; background:#07080c; border-radius:4px;">
+        <b>적용 법령 요지:</b> ${escapeHtml(v.notes)}
+      </div>
+      <div style="font-size:13px; margin:6px 0;"><b>판정 근거:</b> ${escapeHtml(v.rationale)}</div>
+      ${v.untreated.length
+        ? `<div style="color:var(--danger); font-size:12px; margin:4px 0;">⚠ 미처리 항목: ${v.untreated.map(escapeHtml).join(', ')}</div>`
+        : ''}
+      <details style="margin-top:6px;">
+        <summary style="font-size:12px;">요구사항 체크리스트</summary>
+        <div style="margin-top:6px; font-size:12px;">
+          <div style="color:var(--ok); margin-bottom:4px;">✓ 충족 (${v.requirements_met.length})</div>
+          <ul style="margin:0 0 8px 16px; color:var(--muted);">
+            ${v.requirements_met.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+          </ul>
+          <div style="color:var(--hi); margin-bottom:4px;">⌛ 잔여 / 운영 시 추가 (${v.requirements_pending.length})</div>
+          <ul style="margin:0 0 0 16px; color:var(--muted);">
+            ${v.requirements_pending.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+          </ul>
+        </div>
+      </details>
+    </div>
+  `).join('');
+}
+
+psUI.dlText.addEventListener('click', () => {
+  if (!_psResult) return;
+  downloadText('transformed.txt', _psResult.transformed_text);
+});
+psUI.dlJson.addEventListener('click', () => {
+  if (!_psResult) return;
+  // 매핑 테이블은 PoC 학습용 — 실 운영 시 응답에 포함 금지
+  downloadText('pseudo_result.json', JSON.stringify(_psResult, null, 2));
 });
 </script>
 </body>
